@@ -33,7 +33,6 @@ const TelaInicial = () => {
         setCarregando(true);
         setErro(null);
 
-  
         const resposta = await fetch("http://10.0.2.2:8000/carros");
 
         if (!resposta.ok) {
@@ -43,7 +42,6 @@ const TelaInicial = () => {
         const dados = await resposta.json();
         console.log('Resposta da API /carros:', dados);
 
-        // Suporte a resposta com { carros: [...] } ou direto [...]
         setCarros(dados.carros || dados);
       } catch (erro: any) {
         console.error('Erro ao buscar carros:', erro);
@@ -56,7 +54,7 @@ const TelaInicial = () => {
     buscarCarrosDoBanco();
   }, []);
 
-  // 🔍 Filtra os carros localmente pelo nome/marca/modelo
+  // 🔍 Filtra os carros localmente
   const carrosFiltrados = carros.filter((carro) => {
     const texto = textoPesquisa.toLowerCase();
     return (
@@ -67,7 +65,7 @@ const TelaInicial = () => {
     );
   });
 
-  // 🧩 Renderização segura dos cards
+  // 🧩 Renderização dos cards
   const renderizarCarro = ({ item }: { item: any }) => {
     if (!item) {
       return (
@@ -96,7 +94,6 @@ const TelaInicial = () => {
     );
   };
 
-  // 🖼️ Renderização principal
   return (
     <View style={estilos.container}>
       <Text style={estilos.tituloSecao}>Pesquisar</Text>
@@ -155,6 +152,7 @@ const TelaInicial = () => {
         />
       )}
 
+      {/* Modal de filtros */}
       <Modal visible={filtroVisivel} animationType="slide" transparent>
         <View style={estilos.sobreposicaoModal}>
           <View style={estilos.conteudoModal}>
@@ -172,6 +170,26 @@ const TelaInicial = () => {
           </View>
         </View>
       </Modal>
+
+      {/* 🔽 Barra de navegação inferior (copiada do outro código) */}
+      <View style={estilos.barraNavegacaoInferior}>
+        <TouchableOpacity style={estilos.itemNavegacao}>
+          <Ionicons name="home" size={24} color="#2196F3" />
+          <Text style={[estilos.textoNavegacao, { color: '#2196F3' }]}>Início</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={estilos.itemNavegacao}>
+          <Ionicons name="bookmark-outline" size={24} color="#666" />
+          <Text style={estilos.textoNavegacao}>Salvos</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={estilos.itemNavegacao}>
+          <Ionicons name="swap-horizontal" size={24} color="#666" />
+          <Text style={estilos.textoNavegacao}>Comparar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={estilos.itemNavegacao}>
+          <Ionicons name="person-outline" size={24} color="#666" />
+          <Text style={estilos.textoNavegacao}>Perfil</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -222,7 +240,7 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
   },
   conteudoFlatList: {
-    paddingBottom: 80,
+    paddingBottom: 80, // espaço para a barra inferior
   },
   cartaoCarro: {
     width: '45%',
@@ -313,6 +331,28 @@ const estilos = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+  },
+  // 🔽 Estilos da barra de navegação inferior
+  barraNavegacaoInferior: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#ddd',
+    paddingVertical: 10,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  itemNavegacao: {
+    alignItems: 'center',
+  },
+  textoNavegacao: {
+    fontSize: 12,
+    marginTop: 4,
+    color: '#666',
   },
 });
 
