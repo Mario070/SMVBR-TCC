@@ -129,7 +129,16 @@ const DetalhesCarro = () => {
         <View style={{ width: 24 }} />
       </View>
 
-      <Image source={{ uri: campos.imagem }} style={estilos.imagemGrande} />
+      <View style={estilos.imagemContainer}>
+        <Image source={{ uri: campos.imagem }} style={estilos.imagemGrande} />
+        <TouchableOpacity style={estilos.botaoFavorito} onPress={() => {
+          // Aqui você pode adicionar lógica para favoritar/desfavoritar a aproveita 
+          // e ja fazer a logica para quando adiconar no favorito ele ficar marcado 
+          console.log('Alternar favorito');
+        }}>
+          <Ionicons name="heart" size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
       <View style={estilos.infoPrincipal}>
         <Text style={estilos.nomeCarro}>{campos.marca} {campos.modelo}</Text>
@@ -181,6 +190,20 @@ const estilos = StyleSheet.create({
   nomeCarro: { fontSize: 20, fontWeight: 'bold', color: '#000', marginBottom: 4 },
   subtituloCarro: { fontSize: 16, color: '#666' },
 
+  imagemContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  botaoFavorito: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    padding: 6,
+    zIndex: 1,
+  },
+
   secaoDetalhes: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginTop: 16 },
   tituloSecao: { fontSize: 18, fontWeight: 'bold', color: '#000', marginBottom: 12 },
   linhaDetalhe: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
@@ -193,6 +216,7 @@ const estilos = StyleSheet.create({
   textoErro: { textAlign: 'center', marginTop: 20, fontSize: 16, color: '#f44336' },
   botaoVoltar: { backgroundColor: '#2196F3', padding: 12, borderRadius: 8, marginTop: 20, alignSelf: 'center' },
   textoBotao: { color: '#fff', fontWeight: 'bold' },
+
 });
 
 export default DetalhesCarro;
