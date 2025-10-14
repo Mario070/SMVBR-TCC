@@ -9,6 +9,10 @@ import numpy as np
 from rapidfuzz import fuzz, process
 import os
 from typing import Optional
+from backend.modelo import Combustivel, Consumo, Emissao, Favorito,Veiculo
+from backend.esquemas import VeiculoFavorito, FavoritoCreate
+import hashlib
+
 
 # cria tabelas (se ainda não criadas)
 Base.metadata.create_all(bind=engine)
@@ -167,9 +171,9 @@ def pandas_to_json_safe(df: pd.DataFrame):
     return df.to_dict(orient="records")
 
 
-# -------------------------
-# Consulta carros na planilha (versão simplificada e otimizada)
-# -------------------------
+#-------------------------
+#Consulta carros na planilha (versão simplificada e #otimizada)
+#-------------------------
 @app.get("/carros")
 def listar_carros(busca: str = Query(None, description="Pesquisar por marca, modelo ou ano")):
     ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -228,3 +232,136 @@ def listar_carros(busca: str = Query(None, description="Pesquisar por marca, mod
 
     # Se nem fuzzy achou
     return {"mensagem": f"Nenhum carro encontrado com '{busca}'", "carros": [], "total": 0}
+
+# Endpoint para favoritar um veículo
+@app.post("/favoritar/{usuario_id}")
+def favoritar_veiculo(usuario_id: int, dados: VeiculoFavorito, db: Session = Depends(get_db)):
+    # 1️⃣ Cria ou busca o combustível no banco de dados
+    combustivel = db.query(Combustivel).filter_by(tipo=dados.combustivel).first()
+    if not combustivel:  # Se não existir, cria
+        combustivel = Combustivel(tipo=dados.combustivel)
+        db.add(combustivel)  # Adiciona à sessão
+        db.commit()           # Salva no banco
+        db.refresh(combustivel)  # Atualiza o objeto com o ID gerado
+
+    # 2️⃣ Verifica se o veículo já existe no banco
+    veiculo = db.query(Veiculo).filter_by(
+        marca=dados.marca,
+        modelo=dados.modelo,
+        ano=dados.ano,
+        versao=dados.versao
+    ).first()
+
+    # Se o veículo não existir, cria um novo
+    if not veiculo:
+        veiculo = Veiculo(
+            ano=dados.ano,
+            categoria=dados.categoria,
+            marca=dados.marca,
+            modelo=dados.modelo,
+            versao=dados.versao,
+            motor=dados.motor,
+            transmissao=dados.transmissao,
+            ar_condicionado=dados.ar_condicionado,
+            direcao_assistida=dados.direcao_assistida
+        )
+        db.add(veiculo)       # Adiciona à sessão
+        db.commit()           # Salva no banco
+        db.refresh(veiculo)   # Atualiza o objeto com o ID gerado
+
+        # 3️⃣ Cria o registro de emissões do veículo
+        emissao = Emissao(
+            veiculo_id=veiculo.veiculo_id,          # Chave estrangeira para o veículo
+            combustivel_id=combustivel.combustivel_id,  # Chave estrangeira para o combustível
+            nmhc=dados.nmhc,
+            co=dados.co,
+            nox=dados.nox,
+            co2=dados.co2_gasolina or dados.co2_etanol  # Usa CO2 da gasolina ou etanol
+        )
+        db.add(emissao)  # Adiciona à sessão
+
+        # 4️⃣ Cria o registro de consumo do veículo
+        consumo = Consumo(
+            veiculo_id=veiculo.veiculo_id,          # Chave estrangeira para o veículo
+            combustivel_id=combustivel.combustivel_id,  # Chave estrangeira para o combustível
+            rendimento_cidade=dados.rendimento_gasolina_cidade,
+            rendimento_estrada=dados.rendimento_gasolina_estrada,
+            consumo_energetico=dados.consumo_energetico
+        )
+        db.add(consumo)  # Adiciona à sessão
+
+        db.commit()  # Salva emissões e consumo no banco
+
+    # 5️⃣ Verifica se o veículo já está favoritado pelo usuário
+    favorito_existente = db.query(Favorito).filter_by(
+        usuario_id=usuario_id,
+        veiculo_id=veiculo.veiculo_id
+    ).first()
+
+    # Se não estiver favoritado, cria o favorito
+    if not favorito_existente:
+        favorito = Favorito(
+            usuario_id=usuario_id,
+            veiculo_id=veiculo.veiculo_id
+        )
+        db.add(favorito)  # Adiciona à sessão
+        db.commit()       # Salva no banco
+        db.refresh(favorito)  # Atualiza o objeto com o ID gerado
+        return {"mensagem": "Veículo favoritado com sucesso!"}
+    else:
+        return {"mensagem": "Veículo já estava favoritado"}  # Caso já exista
+
+# Endpoint para listar todos os veículos favoritados de um usuário
+@app.get("/favoritos/{usuario_id}")
+def listar_veiculos_favoritos(usuario_id: int, db: Session = Depends(get_db)):
+    # Pega todos os registros de favoritos daquele usuário
+    favoritos = db.query(Favorito).filter(Favorito.usuario_id == usuario_id).all()
+
+    resultado = []  # Lista que vai armazenar os dados para retornar
+
+    # Para cada favorito encontrado
+    for fav in favoritos:
+        veiculo = fav.veiculo  # Pega o objeto do veículo relacionado
+
+        # Dados de consumo do veículo
+        consumos = [
+            {
+                "combustivel_id": c.combustivel_id,
+                "rendimento_cidade": float(c.rendimento_cidade),  # Converte de Decimal para float
+                "rendimento_estrada": float(c.rendimento_estrada),
+                "consumo_energetico": float(c.consumo_energetico)
+            }
+            for c in veiculo.consumos  # Para todos os consumos relacionados ao veículo
+        ]
+
+        # Dados de emissões do veículo
+        emissoes = [
+            {
+                "combustivel_id": e.combustivel_id,
+                "nmhc": float(e.nmhc),
+                "co": float(e.co),
+                "nox": float(e.nox),
+                "co2": float(e.co2)
+            }
+            for e in veiculo.emissoes  # Para todas as emissões relacionadas ao veículo
+        ]
+
+        # Monta o dicionário final do veículo
+        resultado.append({
+            "favorito_id": fav.favorito_id,
+            "veiculo_id": veiculo.veiculo_id,
+            "marca": veiculo.marca,
+            "modelo": veiculo.modelo,
+            "ano": veiculo.ano,
+            "categoria": veiculo.categoria,
+            "versao": veiculo.versao,
+            "motor": veiculo.motor,
+            "transmissao": veiculo.transmissao,
+            "ar_condicionado": veiculo.ar_condicionado,
+            "direcao_assistida": veiculo.direcao_assistida,
+            "consumos": consumos,
+            "emissoes": emissoes
+        })
+
+    # Retorna a lista completa de favoritos e a quantidade total
+    return {"favoritos": resultado, "total": len(resultado)}
