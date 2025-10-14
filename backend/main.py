@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from backend import modelo as models
 from backend import esquemas as schemas
 from backend.database import Base, engine, SessionLocal
-import pandas as pd, os
+import pandas as pd
 import numpy as np
 from rapidfuzz import fuzz, process
 import os
@@ -38,18 +38,27 @@ def cadastro(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(novo)
     return novo
-
+    
 @app.post("/login")
 def login(usuario: schemas.UsuarioLogin, db: Session = Depends(get_db)):
     user = db.query(models.Usuario).filter(models.Usuario.email == usuario.email).first()
     if not user or user.senha != usuario.senha:
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
-    return {"message": f"Bem-vindo {user.nome}!"}
+    
+    # Retorna o id e o nome do usuário para uso no app
+    return {
+        "usuario_id": user.usuario_id,
+        "nome": user.nome,
+        "email": user.email,
+        "message": f"Bem-vindo {user.nome}!"
+    }
+
 
 @app.get("/usuarios", response_model=list[schemas.UsuarioResponse])
 def listar_usuarios(db: Session = Depends(get_db)):
     usuarios = db.query(models.Usuario).all()
     return usuarios
+
 
 # ---------- Função utilitária ----------
 def find_col_insensitive(df: pd.DataFrame, candidates):
@@ -176,7 +185,7 @@ def pandas_to_json_safe(df: pd.DataFrame):
 @app.get("/carros")
 def listar_carros(busca: str = Query(None, description="Pesquisar por marca, modelo ou ano")):
     ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    caminho = os.path.join(ROOT_DIR, "data", "dados convertidos.xlsx")
+    caminho = os.path.join(ROOT_DIR, "data", "Dados originais.xlsx")
 
     if not os.path.exists(caminho):
         raise HTTPException(status_code=404, detail="Arquivo da planilha não encontrado")
@@ -364,22 +373,3 @@ def listar_veiculos_favoritos(usuario_id: int, db: Session = Depends(get_db)):
 
     # Retorna a lista completa de favoritos e a quantidade total
     return {"favoritos": resultado, "total": len(resultado)}
-
-@app.get("/carros/{carro_id}")
-def obter_carro(carro_id: int):
-    caminho = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "dados convertidos.xlsx")
-    if not os.path.exists(caminho):
-        raise HTTPException(status_code=404, detail="Arquivo da planilha não encontrado")
-
-    df = pd.read_excel(caminho)
-    df.columns = [c.strip().lower() for c in df.columns]
-
-    # Garantir coluna de ID
-    if "id" not in df.columns:
-        df = df.reset_index().rename(columns={"index": "id"})
-
-    carro = df[df["id"] == carro_id]
-    if carro.empty:
-        raise HTTPException(status_code=404, detail="Carro não encontrado")
-
-    return carro.to_dict(orient="records")[0]
