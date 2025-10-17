@@ -73,11 +73,10 @@ def find_col_insensitive(df: pd.DataFrame, candidates):
     return None
 
 
-# ---------- Filtro simplificado ----------
 @app.get("/filtro-carros")
 def filtro_carros(
     ano: Optional[int] = Query(None),
-    categoria: Optional[str] = Query(None),
+    grupo: Optional[str] = Query(None),
     marca: Optional[str] = Query(None),
     motor: Optional[str] = Query(None),
     transmissao: Optional[str] = Query(None),
@@ -88,7 +87,7 @@ def filtro_carros(
     limite: int = Query(20, ge=1, le=200)
 ):
     ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    caminho = os.path.join(ROOT_DIR, "data", "Dados originais.xlsx")
+    caminho = os.path.join(ROOT_DIR, "data", "database.xlsx")
 
     if not os.path.exists(caminho):
         raise HTTPException(status_code=404, detail="Arquivo da planilha não encontrado")
@@ -98,7 +97,6 @@ def filtro_carros(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao abrir planilha: {e}")
 
-    # padroniza nomes de colunas
     df.columns = [c.strip() for c in df.columns]
     df_work = df.copy()
 
@@ -108,10 +106,10 @@ def filtro_carros(
         if col:
             df_work = df_work[pd.to_numeric(df_work[col], errors="coerce") == int(ano)]
 
-    if categoria:
-        col = find_col_insensitive(df_work, ["CATEGORIA", "Categoria", "GRUPO", "Grupo"])
+    if grupo:
+        col = find_col_insensitive(df_work, ["GRUPO", "Grupo"])
         if col:
-            df_work = df_work[df_work[col].astype(str).str.lower().str.contains(categoria.lower(), na=False)]
+            df_work = df_work[df_work[col].astype(str).str.lower().str.contains(grupo.lower(), na=False)]
 
     if marca:
         col = find_col_insensitive(df_work, ["MARCA", "Marca"])
@@ -119,12 +117,12 @@ def filtro_carros(
             df_work = df_work[df_work[col].astype(str).str.lower().str.contains(marca.lower(), na=False)]
 
     if motor:
-        col = find_col_insensitive(df_work, ["MOTOR", "Motor"])
+        col = find_col_insensitive(df_work, ["FAIXA", "Faixa"])
         if col:
             df_work = df_work[df_work[col].astype(str).str.lower().str.contains(motor.lower(), na=False)]
 
     if transmissao:
-        col = find_col_insensitive(df_work, ["TRANSMISSAO", "Transmissão"])
+        col = find_col_insensitive(df_work, ["CÂMBIO" "Câmbio"])
         if col:
             df_work = df_work[df_work[col].astype(str).str.lower().str.contains(transmissao.lower(), na=False)]
 
@@ -143,9 +141,11 @@ def filtro_carros(
         if col:
             df_work = df_work[df_work[col].astype(str).str.lower().str.contains(combustivel.lower(), na=False)]
 
-    # Se não restar nenhum resultado
-    if df_work.empty:
-        return {"total": 0, "pagina": pagina, "limite": limite, "resultados": []}
+    # -------- Ordenar por Ranking (do maior para o menor) --------
+    col_ranking = find_col_insensitive(df_work, ["Pontuação Final"])
+    if col_ranking:
+        df_work[col_ranking] = pd.to_numeric(df_work[col_ranking], errors="coerce")
+        df_work = df_work.sort_values(by=col_ranking, ascending=False)
 
     # -------- Paginação --------
     total = len(df_work)
@@ -185,7 +185,7 @@ def pandas_to_json_safe(df: pd.DataFrame):
 @app.get("/carros")
 def listar_carros(busca: str = Query(None, description="Pesquisar por marca, modelo ou ano")):
     ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    caminho = os.path.join(ROOT_DIR, "data", "Dados originais.xlsx")
+    caminho = os.path.join(ROOT_DIR, "data", "database.xlsx")
 
     if not os.path.exists(caminho):
         raise HTTPException(status_code=404, detail="Arquivo da planilha não encontrado")
