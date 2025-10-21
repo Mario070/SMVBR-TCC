@@ -28,12 +28,20 @@ const DetalhesCarro = () => {
         if (carroParam) {
           try {
             const parsed = JSON.parse(decodeURIComponent(String(carroParam)));
-            setCarro(parsed);
+
+            // 🔄 Normaliza as chaves do objeto (tudo para minúsculas)
+            const normalizado = Object.keys(parsed).reduce((acc: any, key: string) => {
+              acc[key.toLowerCase()] = parsed[key];
+              return acc;
+            }, {});
+
+            setCarro(normalizado);
             return;
           } catch (e) {
             console.warn('Falha ao parsear carro dos params:', e);
           }
         }
+
 
         if (id) {
           const resp = await fetch(`http://10.0.2.2:8000/carros/${id}`);

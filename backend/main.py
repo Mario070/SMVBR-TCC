@@ -185,7 +185,7 @@ def pandas_to_json_safe(df: pd.DataFrame):
 @app.get("/carros")
 def listar_carros(busca: str = Query(None, description="Pesquisar por marca, modelo ou ano")):
     ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    caminho = os.path.join(ROOT_DIR, "data", "database.xlsx")
+    caminho = os.path.join(ROOT_DIR, "data", "dados convertidos.xlsx")
 
     if not os.path.exists(caminho):
         raise HTTPException(status_code=404, detail="Arquivo da planilha não encontrado")
