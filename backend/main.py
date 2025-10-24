@@ -1,5 +1,5 @@
 # backend/main.py
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query,Body
 from sqlalchemy.orm import Session
 from backend import modelo as models
 from backend import esquemas as schemas
@@ -179,7 +179,7 @@ def pandas_to_json_safe(df: pd.DataFrame):
     return df.to_dict(orient="records")
 
 
-#-------------------------
+
 #Consulta carros na planilha (versão simplificada e #otimizada)
 #-------------------------
 @app.get("/carros")
@@ -197,7 +197,7 @@ def listar_carros(busca: str = Query(None, description="Pesquisar por marca, mod
 
     # Normaliza colunas
     df.columns = [c.strip().lower() for c in df.columns]
-    for col in ["marca", "modelo", "ano"]:
+    for col in ["marca", "modelo", "ano", "codigo"]:
         if col not in df.columns:
             raise HTTPException(status_code=500, detail=f"Coluna '{col}' ausente na planilha")
         df[col] = df[col].fillna("").astype(str).str.strip().str.upper()
@@ -241,135 +241,126 @@ def listar_carros(busca: str = Query(None, description="Pesquisar por marca, mod
     # Se nem fuzzy achou
     return {"mensagem": f"Nenhum carro encontrado com '{busca}'", "carros": [], "total": 0}
 
-# Endpoint para favoritar um veículo
 @app.post("/favoritar/{usuario_id}")
-def favoritar_veiculo(usuario_id: int, dados: VeiculoFavorito, db: Session = Depends(get_db)):
-    # 1️⃣ Cria ou busca o combustível no banco de dados
-    combustivel = db.query(Combustivel).filter_by(tipo=dados.combustivel).first()
-    if not combustivel:  # Se não existir, cria
-        combustivel = Combustivel(tipo=dados.combustivel)
-        db.add(combustivel)  # Adiciona à sessão
-        db.commit()           # Salva no banco
-        db.refresh(combustivel)  # Atualiza o objeto com o ID gerado
+def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: Session = Depends(get_db)):
+    """
+    Favorita um veículo baseado no código existente na planilha.
+    O front envia: { "codigo": "COD12345" }
+    """
 
-    # 2️⃣ Verifica se o veículo já existe no banco
-    veiculo = db.query(Veiculo).filter_by(
-        marca=dados.marca,
-        modelo=dados.modelo,
-        ano=dados.ano,
-        versao=dados.versao
-    ).first()
+    # Caminho da planilha
+    ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    caminho = os.path.join(ROOT_DIR, "data", "dados convertidos.xlsx")
 
-    # Se o veículo não existir, cria um novo
+    if not os.path.exists(caminho):
+        raise HTTPException(status_code=404, detail="Arquivo da planilha não encontrado")
+
+    # Lê a planilha
+    df = pd.read_excel(caminho)
+
+    # Normaliza colunas: remove espaços, acentos, coloca lower
+    df.columns = [
+        c.strip().lower()
+        .replace(" ", "_")
+        .replace("-", "_")
+        .replace("(", "")
+        .replace(")", "")
+        .replace("ç", "c")
+    for c in df.columns
+    ]
+
+    # Normaliza coluna de código
+    if "codigo" not in df.columns:
+        raise HTTPException(status_code=500, detail="Coluna 'codigo' ausente na planilha")
+    df["codigo"] = df["codigo"].astype(str).str.strip()
+    codigo = str(codigo).strip()
+
+    # Busca o carro pelo código
+    carro = df[df["codigo"] == codigo.upper()].to_dict(orient="records")
+    if not carro:
+        raise HTTPException(status_code=404, detail=f"Nenhum carro encontrado com código {codigo}")
+    carro = carro[0]
+
+    # Cria ou busca combustível
+    combustivel_tipo = carro.get("combustivel", "N/A")
+    combustivel = db.query(Combustivel).filter_by(tipo=combustivel_tipo).first()
+    if not combustivel:
+        combustivel = Combustivel(tipo=combustivel_tipo)
+        db.add(combustivel)
+        db.commit()
+        db.refresh(combustivel)
+
+    # Converte ar_condicionado para Boolean
+    ar_condicionado = carro.get("ar_condicionado", "N")
+    if isinstance(ar_condicionado, str):
+        ar_condicionado = ar_condicionado.strip().lower() in ["sim", "s", "true", "1"]
+    else:
+        ar_condicionado = bool(ar_condicionado)
+
+    # Converte direcao_assistida para Enum válido
+    direcao_assistida = carro.get("direcao_assistida", "M")
+    if direcao_assistida not in ["H", "E", "H-E", "M"]:
+        direcao_assistida = "M"
+
+    # Verifica se o veículo já existe
+    veiculo = db.query(Veiculo).filter_by(codigo=carro["codigo"]).first()
+
     if not veiculo:
         veiculo = Veiculo(
-            ano=dados.ano,
-            categoria=dados.categoria,
-            marca=dados.marca,
-            modelo=dados.modelo,
-            versao=dados.versao,
-            motor=dados.motor,
-            transmissao=dados.transmissao,
-            ar_condicionado=dados.ar_condicionado,
-            direcao_assistida=dados.direcao_assistida
+            codigo=carro["codigo"],
+            ano=int(carro.get("ano", 0)),
+            categoria=carro.get("categoria"),
+            marca=carro.get("marca"),
+            modelo=carro.get("modelo"),
+            versao=carro.get("versao"),
+            motor=carro.get("motor"),
+            transmissao=carro.get("transmissao"),
+            ar_condicionado=ar_condicionado,
+            direcao_assistida=direcao_assistida
         )
-        db.add(veiculo)       # Adiciona à sessão
-        db.commit()           # Salva no banco
-        db.refresh(veiculo)   # Atualiza o objeto com o ID gerado
+        db.add(veiculo)
+        db.commit()
+        db.refresh(veiculo)
 
-        # 3️⃣ Cria o registro de emissões do veículo
+        # Cria emissões
         emissao = Emissao(
-            veiculo_id=veiculo.veiculo_id,          # Chave estrangeira para o veículo
-            combustivel_id=combustivel.combustivel_id,  # Chave estrangeira para o combustível
-            nmhc=dados.nmhc,
-            co=dados.co,
-            nox=dados.nox,
-            co2=dados.co2_gasolina or dados.co2_etanol  # Usa CO2 da gasolina ou etanol
+            veiculo_id=veiculo.veiculo_id,
+            combustivel_id=combustivel.combustivel_id,
+            nmhc=float(carro.get("emissao_de_nmhc_g_km") or 0),
+            co=float(carro.get("emissao_de_co_g_km") or 0),
+            nox=float(carro.get("emissao_de_nox_g_km") or 0),
+            co2=float(
+                carro.get("emissao_de_co2_gas_efeito_estufa_a_produzido_pela_combustao_do_etanol_g_km")
+                or carro.get("emissao_de_co2_gas_efeito_estufa_a_produzido_pela_combustao_da_gasolina_ou_diesel_g_km")
+                or 0
+            )
         )
-        db.add(emissao)  # Adiciona à sessão
+        db.add(emissao)
 
-        # 4️⃣ Cria o registro de consumo do veículo
+        # Cria consumo
         consumo = Consumo(
-            veiculo_id=veiculo.veiculo_id,          # Chave estrangeira para o veículo
-            combustivel_id=combustivel.combustivel_id,  # Chave estrangeira para o combustível
-            rendimento_cidade=dados.rendimento_gasolina_cidade,
-            rendimento_estrada=dados.rendimento_gasolina_estrada,
-            consumo_energetico=dados.consumo_energetico
+            veiculo_id=veiculo.veiculo_id,
+            combustivel_id=combustivel.combustivel_id,
+            rendimento_cidade=float(carro.get("rendimento_da_gasolina_ou_diesel_na_cidade_km_l") or 0),
+            rendimento_estrada=float(carro.get("rendimento_da_gasolina_ou_diesel_estrada_km_l") or 0),
+            consumo_energetico=float(carro.get("consumo_energetico_mj_km") or 0)
         )
-        db.add(consumo)  # Adiciona à sessão
+        db.add(consumo)
+        db.commit()
 
-        db.commit()  # Salva emissões e consumo no banco
-
-    # 5️⃣ Verifica se o veículo já está favoritado pelo usuário
+    # Cria favorito se não existir
     favorito_existente = db.query(Favorito).filter_by(
         usuario_id=usuario_id,
         veiculo_id=veiculo.veiculo_id
     ).first()
 
-    # Se não estiver favoritado, cria o favorito
-    if not favorito_existente:
-        favorito = Favorito(
-            usuario_id=usuario_id,
-            veiculo_id=veiculo.veiculo_id
-        )
-        db.add(favorito)  # Adiciona à sessão
-        db.commit()       # Salva no banco
-        db.refresh(favorito)  # Atualiza o objeto com o ID gerado
-        return {"mensagem": "Veículo favoritado com sucesso!"}
-    else:
-        return {"mensagem": "Veículo já estava favoritado"}  # Caso já exista
+    if favorito_existente:
+        return {"mensagem": "Veículo já está favoritado"}
 
-# Endpoint para listar todos os veículos favoritados de um usuário
-@app.get("/favoritos/{usuario_id}")
-def listar_veiculos_favoritos(usuario_id: int, db: Session = Depends(get_db)):
-    # Pega todos os registros de favoritos daquele usuário
-    favoritos = db.query(Favorito).filter(Favorito.usuario_id == usuario_id).all()
+    favorito = Favorito(usuario_id=usuario_id, veiculo_id=veiculo.veiculo_id)
+    db.add(favorito)
+    db.commit()
+    db.refresh(favorito)
 
-    resultado = []  # Lista que vai armazenar os dados para retornar
+    return {"mensagem": "Veículo favoritado com sucesso!"}
 
-    # Para cada favorito encontrado
-    for fav in favoritos:
-        veiculo = fav.veiculo  # Pega o objeto do veículo relacionado
-
-        # Dados de consumo do veículo
-        consumos = [
-            {
-                "combustivel_id": c.combustivel_id,
-                "rendimento_cidade": float(c.rendimento_cidade),  # Converte de Decimal para float
-                "rendimento_estrada": float(c.rendimento_estrada),
-                "consumo_energetico": float(c.consumo_energetico)
-            }
-            for c in veiculo.consumos  # Para todos os consumos relacionados ao veículo
-        ]
-
-        # Dados de emissões do veículo
-        emissoes = [
-            {
-                "combustivel_id": e.combustivel_id,
-                "nmhc": float(e.nmhc),
-                "co": float(e.co),
-                "nox": float(e.nox),
-                "co2": float(e.co2)
-            }
-            for e in veiculo.emissoes  # Para todas as emissões relacionadas ao veículo
-        ]
-
-        # Monta o dicionário final do veículo
-        resultado.append({
-            "favorito_id": fav.favorito_id,
-            "veiculo_id": veiculo.veiculo_id,
-            "marca": veiculo.marca,
-            "modelo": veiculo.modelo,
-            "ano": veiculo.ano,
-            "categoria": veiculo.categoria,
-            "versao": veiculo.versao,
-            "motor": veiculo.motor,
-            "transmissao": veiculo.transmissao,
-            "ar_condicionado": veiculo.ar_condicionado,
-            "direcao_assistida": veiculo.direcao_assistida,
-            "consumos": consumos,
-            "emissoes": emissoes
-        })
-
-    # Retorna a lista completa de favoritos e a quantidade total
-    return {"favoritos": resultado, "total": len(resultado)}

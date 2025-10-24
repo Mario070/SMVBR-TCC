@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
 import { Checkbox } from 'react-native-paper';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const PAGE_STEP = 20;
 
@@ -100,18 +101,39 @@ const TelaInicial = () => {
     buscarCarros();
   }, []);
 
-  const getId = (item: any, fallback: number) =>
-    String(item?.veiculo_id ?? item?.id ?? fallback);
+const getId = (item: any, fallback: number) =>
+  String(item?.veiculo_id ?? item?.id ?? fallback);
 
-  const toggleFavorito = (item: any, fallbackIndex: number) => {
-    const id = getId(item, fallbackIndex);
-    setFavoritos((prev) => {
-      const novo = { ...prev };
-      if (novo[id]) delete novo[id];
-      else novo[id] = true;
-      return novo;
+const toggleFavorito = async (item: any, fallbackIndex: number) => {
+  const usuarioId = await AsyncStorage.getItem("usuario_id");
+
+  if (!usuarioId) {
+    Alert.alert("Erro", "Usuário não logado.");
+    return;
+  }
+
+  try {
+    const resposta = await fetch(`http://10.0.2.2:8000/favoritar/${usuarioId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ codigo: String(item.codigo) }), // ✅ enviar como string
     });
-  };
+
+    const data = await resposta.json();
+
+    if (resposta.ok) {
+      const msg = Array.isArray(data.mensagem) ? data.mensagem.join("\n") : String(data.mensagem);
+      Alert.alert("Sucesso", msg);
+    } else {
+      const msg = Array.isArray(data.detail) ? data.detail.join("\n") : String(data.detail);
+      Alert.alert("Erro", msg);
+    }
+  } catch (error) {
+    console.error(error);
+    Alert.alert("Erro", "Falha de conexão com o servidor");
+  }
+};
+
 
   // filtro de texto
   const carrosFiltrados = useMemo(() => {

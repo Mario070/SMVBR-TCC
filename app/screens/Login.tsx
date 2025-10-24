@@ -1,4 +1,3 @@
-// app/screens/Login.tsx
 import React, { useState } from "react";
 import {
   View,
@@ -9,6 +8,7 @@ import {
   Alert,
   Image,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage"; // ✅ importa o AsyncStorage
 import { router } from "expo-router";
 
 export default function Login() {
@@ -28,13 +28,24 @@ export default function Login() {
         body: JSON.stringify({ email, senha }),
       });
 
+      const data = await response.json();
+      console.log("Resposta do backend:", data);
+
       if (response.ok) {
-        const data = await response.json();
-        Alert.alert("Sucesso", data.message || "Login realizado!");
-      router.push("/screens/home");
-      }else {
-        const errorData = await response.json();
-        Alert.alert("Erro", errorData.detail || "Credenciais inválidas");
+        const usuarioNome = Array.isArray(data.nome) ? data.nome[0] : data.nome;
+      const message = Array.isArray(data.message) ?     data.message[0] : data.message;
+
+        // ✅ Salva os dados do usuário localmente
+        await AsyncStorage.setItem("usuario_id", String(data.usuario_id));
+        await AsyncStorage.setItem("usuario_nome", usuarioNome);
+
+        Alert.alert("Sucesso", message || "Login realizado!");
+
+        // Redireciona para a Home
+        router.push("/screens/home");
+      } else {
+        const errorMsg = Array.isArray(data.detail) ? data.detail[0] : data.detail;
+        Alert.alert("Erro", errorMsg || "Credenciais inválidas");
       }
     } catch (error) {
       Alert.alert("Erro", "Não foi possível conectar ao servidor.");

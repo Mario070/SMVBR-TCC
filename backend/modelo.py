@@ -44,6 +44,7 @@ class Veiculo(Base):
 
     veiculo_id = Column(Integer, primary_key=True, autoincrement=True)
     ano = Column(Integer, nullable=False)
+    codigo = Column(Integer, nullable=False)
     categoria = Column(String(100))
     marca = Column(String(100), nullable=False)
     modelo = Column(String(150), nullable=False)
