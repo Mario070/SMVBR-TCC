@@ -1,5 +1,4 @@
-// app/favoritos.tsx
-import React from 'react';
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -8,82 +7,103 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-} from 'react-native';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { Checkbox } from 'react-native-paper';
-
-// 🔹 MODELO DE TELA DE FAVORITOS
-// Esta tela exibe os carros favoritos em cards e permite selecionar 2 para comparação.
-// ➤ Você deve implementar a lógica de:
-//    - Carregar os carros favoritos (ex: de AsyncStorage, contexto ou API)
-//    - Gerenciar seleção de até 2 carros
-//    - Navegar para a tela de comparação com os IDs selecionados
+  Alert,
+} from "react-native";
+import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { Checkbox } from "react-native-paper";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const TelaFavoritos = () => {
-  // 🔸 IMPLEMENTAR: estado para carregar favoritos (ex: const [favoritos, setFavoritos] = useState<Carro[]>([]))
-  // 🔸 IMPLEMENTAR: estado para carros selecionados (ex: const [selecionados, setSelecionados] = useState<number[]>([]))
-  // 🔸 IMPLEMENTAR: estado de carregamento (ex: const [carregando, setCarregando] = useState(true))
+  const [favoritos, setFavoritos] = useState<any[]>([]);
+  const [selecionados, setSelecionados] = useState<number[]>([]);
+  const [carregando, setCarregando] = useState(true);
 
-  // 🔸 IMPLEMENTAR: função para alternar seleção de um carro (com limite de 2)
+  // 🔹 Busca os favoritos do usuário logado
+  useEffect(() => {
+    const carregarFavoritos = async () => {
+      try {
+        setCarregando(true);
+        const usuarioId = await AsyncStorage.getItem("usuario_id");
+
+        if (!usuarioId) {
+          Alert.alert("Erro", "Usuário não identificado!");
+          setCarregando(false);
+          return;
+        }
+
+        const response = await fetch(
+          `http://10.0.2.2:8000/veiculos_favoritos/${usuarioId}`
+        );
+
+        if (!response.ok) {
+          throw new Error("Erro ao buscar veículos favoritos");
+        }
+
+        const data = await response.json();
+        setFavoritos(data);
+      } catch (error) {
+        console.error("Erro ao carregar favoritos:", error);
+        Alert.alert("Erro", "Não foi possível carregar os favoritos.");
+      } finally {
+        setCarregando(false);
+      }
+    };
+
+    carregarFavoritos();
+  }, []);
+
+  // 🔹 Alterna a seleção de carros (máx. 2)
   const toggleSelecao = (id: number) => {
-    // ➤ Lógica: adicionar/remover ID de 'selecionados'
-    // ➤ Alerta se tentar selecionar mais de 2
+    setSelecionados((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((item) => item !== id);
+      } else if (prev.length < 2) {
+        return [...prev, id];
+      } else {
+        Alert.alert("Limite atingido", "Você só pode comparar até 2 carros.");
+        return prev;
+      }
+    });
   };
 
-  // 🔸 IMPLEMENTAR: função para comparar os 2 carros selecionados
+  // 🔹 Navega para a tela de comparação
   const handleComparar = () => {
-    // ➤ Verificar se exatamente 2 carros estão selecionados
-    // ➤ Navegar para /comparar com os IDs (ex: router.push(`/comparar?ids=${id1},${id2}`))
+    if (selecionados.length !== 2) {
+      Alert.alert("Seleção inválida", "Selecione exatamente 2 carros.");
+      return;
+    }
+
   };
 
-  // 🔸 IMPLEMENTAR: dados reais dos favoritos (aqui está um exemplo estático apenas para layout)
-  const dadosExemplo = [
-    {
-      id: 1,
-      marca: 'Toyota',
-      modelo: 'Corolla',
-      ano: 2023,
-      preco: 'R$ 120.000',
-      imagem: 'https://example.com/corolla.jpg',
-    },
-    {
-      id: 2,
-      marca: 'Honda',
-      modelo: 'Civic',
-      ano: 2022,
-      preco: 'R$ 110.000',
-      imagem: 'https://example.com/civic.jpg',
-    },
-  ];
-
-  // 🔸 IMPLEMENTAR: condição real de carregamento
-  const carregando = false;
-
+  // 🔹 Renderiza cada card de veículo
   const renderizarFavorito = ({ item }: { item: any }) => {
-    const imagemUri = item.imagem?.trim() || 'https://cdn-icons-png.flaticon.com/512/744/744465.png';
+    const imagemUri =
+      item.imagem?.trim() || "https://cdn-icons-png.flaticon.com/512/744/744465.png";
 
     return (
       <View style={estilos.cartaoCarro}>
-        {/* Checkbox para seleção de comparação */}
         <View style={estilos.checkboxContainer}>
           <Checkbox
-            status={'unchecked'} // 🔸 IMPLEMENTAR: 'checked' se item.id estiver em 'selecionados'
-            onPress={() => toggleSelecao(item.id)}
+            status={selecionados.includes(item.veiculo_id) ? "checked" : "unchecked"}
+            onPress={() => toggleSelecao(item.veiculo_id)}
           />
         </View>
 
-        {/* Card clicável para ver detalhes */}
         <TouchableOpacity
           style={estilos.conteudoCarro}
-          onPress={() => {
-            // 🔸 IMPLEMENTAR: navegar para /detalhes/[id]
-          }}
+          onPress={() => router.push(`/detalhes/${item.veiculo_id}`)}
         >
           <Image source={{ uri: imagemUri }} style={estilos.imagemCarro} />
-          <Text style={estilos.nomeCarro}>{item.marca} {item.modelo}</Text>
+          <Text style={estilos.nomeCarro}>
+            {item.marca} {item.modelo}
+          </Text>
           <Text style={estilos.precoCarro}>Ano: {item.ano}</Text>
-          {item.preco && <Text style={estilos.precoCarro}>Preço: {item.preco}</Text>}
+          {item.tipo_combustivel && (
+            <Text style={estilos.precoCarro}>
+              Combustível: {item.tipo_combustivel}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
     );
@@ -101,9 +121,9 @@ const TelaFavoritos = () => {
       ) : (
         <>
           <FlatList
-            data={dadosExemplo} // 🔸 IMPLEMENTAR: usar o estado real de 'favoritos'
+            data={favoritos}
             renderItem={renderizarFavorito}
-            keyExtractor={(item) => String(item.id)}
+            keyExtractor={(item) => String(item.veiculo_id)}
             numColumns={2}
             contentContainerStyle={estilos.conteudoFlatList}
             ListEmptyComponent={
@@ -113,105 +133,86 @@ const TelaFavoritos = () => {
             }
           />
 
-          {/* Botão de Comparar */}
+          {/* 🔹 Botão de Comparar */}
           <TouchableOpacity
-            style={[estilos.botaoComparar,
-              // 🔸 IMPLEMENTAR: desativar se selecionados.length !== 2
-              { opacity: 0.5 }, // exemplo: ativar apenas quando 2 selecionados
+            style={[
+              estilos.botaoComparar,
+              { opacity: selecionados.length === 2 ? 1 : 0.5 },
             ]}
-            disabled={true} // 🔸 IMPLEMENTAR: true se !== 2 selecionados
+            disabled={selecionados.length !== 2}
             onPress={handleComparar}
           >
             <Ionicons name="swap-horizontal" size={20} color="#fff" />
             <Text style={estilos.textoBotaoComparar}>
-              Comparar (0/2) {/* 🔸 IMPLEMENTAR: mostrar contagem real */}
+              Comparar ({selecionados.length}/2)
             </Text>
           </TouchableOpacity>
         </>
       )}
 
-      {/* 👇👇👇 BARRA DE NAVEGAÇÃO INFERIOR */}
-            <View style={estilos.barraNavegacao}>
-              <TouchableOpacity
-                style={estilos.iconeNavegacao}
-                onPress={() => {
-                  // 🔸 IMPLEMENTAR: navegar para tela de início (ex: router.push('/'))
-                  // Como já estamos na tela inicial, pode não fazer nada ou recarregar
-                }}
-              >
-                <Ionicons name="home" size={24} color="#2196F3" />
-                <Text style={estilos.textoNavegacaoAtivo} onPress={() => {
-                  // 🔸 IMPLEMENTAR: navegar para tela de favoritos
-                  router.push('/screens/home');
-                }}>Início</Text>
-              </TouchableOpacity>
-      
-              <TouchableOpacity
-                style={estilos.iconeNavegacao}
-                onPress={() => {
-                  // 🔸 IMPLEMENTAR: navegar para tela de favoritos
-                  router.push('/screens/telafavoritos');
-                }}
-              >
-                <Ionicons name="heart" size={24} color="#888" />
-                <Text style={estilos.textoNavegacao}>Favoritos</Text>
-              </TouchableOpacity>
-      
-              <TouchableOpacity
-                style={estilos.iconeNavegacao}
-                onPress={() => {
-                  // 🔸 IMPLEMENTAR: navegar para tela de perfil
-                  
-                }}
-              >
-                <Ionicons name="person" size={24} color="#888" />
-                <Text style={estilos.textoNavegacao}>Perfil</Text>
-              </TouchableOpacity>
-      
-              <TouchableOpacity
-                style={estilos.iconeNavegacao}
-                onPress={() => {
-                  // 🔸 IMPLEMENTAR: navegar para tela de configurações
-                  
-                }}
-              >
-                <Ionicons name="settings" size={24} color="#888" />
-                <Text style={estilos.textoNavegacao}>Config.</Text>
-              </TouchableOpacity>
-            </View>
+      {/* 🔹 Barra de Navegação Inferior */}
+      <View style={estilos.barraNavegacao}>
+        <TouchableOpacity
+          style={estilos.iconeNavegacao}
+          onPress={() => router.push("/screens/home")}
+        >
+          <Ionicons name="home" size={24} color="#2196F3" />
+          <Text style={estilos.textoNavegacaoAtivo}>Início</Text>
+        </TouchableOpacity>
 
+        <TouchableOpacity
+          style={estilos.iconeNavegacao}
+          onPress={() => router.push("/screens/telafavoritos")}
+        >
+          <Ionicons name="heart" size={24} color="#888" />
+          <Text style={estilos.textoNavegacao}>Favoritos</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={estilos.iconeNavegacao}>
+          <Ionicons name="person" size={24} color="#888" />
+          <Text style={estilos.textoNavegacao}>Perfil</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={estilos.iconeNavegacao}>
+          <Ionicons name="settings" size={24} color="#888" />
+          <Text style={estilos.textoNavegacao}>Config.</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
+export default TelaFavoritos;
+
+// ✅ Usa exatamente seus estilos originais
 const estilos = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     padding: 16,
   },
   titulo: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 16,
-    textAlign: 'center',
-    color: '#000',
+    textAlign: "center",
+    color: "#000",
   },
   cartaoCarro: {
-    width: '45%',
-    margin: '2.5%',
-    backgroundColor: '#fff',
+    width: "45%",
+    margin: "2.5%",
+    backgroundColor: "#fff",
     borderRadius: 10,
-    overflow: 'hidden',
+    overflow: "hidden",
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    position: 'relative',
+    position: "relative",
   },
   checkboxContainer: {
-    position: 'absolute',
+    position: "absolute",
     top: 8,
     right: 8,
     zIndex: 1,
@@ -220,89 +221,84 @@ const estilos = StyleSheet.create({
     flex: 1,
   },
   imagemCarro: {
-    width: '100%',
+    width: "100%",
     height: 100,
   },
   nomeCarro: {
     padding: 8,
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#000',
+    fontWeight: "bold",
+    color: "#000",
   },
   precoCarro: {
     paddingHorizontal: 8,
     paddingBottom: 8,
     fontSize: 14,
-    color: '#2196F3',
+    color: "#2196F3",
   },
   conteudoFlatList: {
     paddingBottom: 80,
   },
   botaoComparar: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 80,
     left: 16,
     right: 16,
-    backgroundColor: '#2196F3',
+    backgroundColor: "#2196F3",
     paddingVertical: 14,
     borderRadius: 8,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     gap: 8,
   },
   textoBotaoComparar: {
-    color: '#fff',
-    fontWeight: 'bold',
+    color: "#fff",
+    fontWeight: "bold",
     fontSize: 16,
   },
   centralizar: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   textoCarregando: {
     marginTop: 10,
     fontSize: 16,
-    color: '#666',
+    color: "#666",
   },
   textoVazio: {
     fontSize: 16,
-    color: '#999',
-    textAlign: 'center',
+    color: "#999",
+    textAlign: "center",
   },
-
-  // 👇 ESTILOS DA BARRA DE NAVEGAÇÃO INFERIOR
   barraNavegacao: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    backgroundColor: "#fff",
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: "#eee",
     paddingVertical: 10,
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     paddingHorizontal: 16,
   },
   iconeNavegacao: {
-    alignItems: 'center',
+    alignItems: "center",
     flex: 1,
   },
   textoNavegacao: {
     fontSize: 12,
-    color: '#888',
+    color: "#888",
     marginTop: 4,
   },
   textoNavegacaoAtivo: {
     fontSize: 12,
-    color: '#2196F3',
-    fontWeight: 'bold',
+    color: "#2196F3",
+    fontWeight: "bold",
     marginTop: 4,
   },
-
 });
-
-export default TelaFavoritos;
