@@ -92,7 +92,19 @@ const TelaFavoritos = () => {
 
         <TouchableOpacity
           style={estilos.conteudoCarro}
-          onPress={() => router.push(`/detalhes/${item.veiculo_id}`)}
+          onPress={() => {
+            const carroString = encodeURIComponent(JSON.stringify(item));
+            router.push({
+              pathname: "/detalhes/[id]",
+              params: {
+                id: String(item.veiculo_id),
+                carro: carroString,
+              },
+            });
+          }}
+
+
+
         >
           <Image source={{ uri: imagemUri }} style={estilos.imagemCarro} />
           <Text style={estilos.nomeCarro}>

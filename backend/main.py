@@ -359,12 +359,20 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
     )
     db.add(consumo)
     db.commit()
-    db.refresh(consumo)
 
+    # --- ADICIONA OU REMOVE FAVORITO ---
+    favorito_existente = db.query(Favorito).filter_by(usuario_id=usuario_id, veiculo_id=veiculo.veiculo_id).first()
+    if favorito_existente:
+        db.delete(favorito_existente)
+        msg = "Veículo removido dos favoritos."
+    else:
+        novo_fav = Favorito(usuario_id=usuario_id, veiculo_id=veiculo.veiculo_id)
+        db.add(novo_fav)
+        msg = "Veículo adicionado aos favoritos."
 
-    return {"mensagem": "Veículo favoritado com sucesso!"}
+    db.commit()
 
-    print(df.columns.tolist())
+    return {"mensagem": msg}
 
 
 
