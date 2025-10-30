@@ -53,6 +53,7 @@ class Veiculo(Base):
     transmissao = Column(String(100))
     ar_condicionado = Column(Boolean)
     direcao_assistida = Column(Enum('H', 'E', 'H-E', 'M'), nullable=False)
+    scoreFinal = Column(DECIMAL(10, 6), nullable=False)  # 👈 novo campo
 
     # relacionamentos
     emissoes = relationship("Emissao", back_populates="veiculo")

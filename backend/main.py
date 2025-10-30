@@ -185,7 +185,7 @@ def pandas_to_json_safe(df: pd.DataFrame):
 @app.get("/carros")
 def listar_carros(busca: str = Query(None, description="Pesquisar por marca, modelo ou ano")):
     ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    caminho = os.path.join(ROOT_DIR, "data", "dados convertidos.xlsx")
+    caminho = os.path.join(ROOT_DIR, "data", "database.xlsx")
 
     if not os.path.exists(caminho):
         raise HTTPException(status_code=404, detail="Arquivo da planilha não encontrado")
@@ -240,7 +240,6 @@ def listar_carros(busca: str = Query(None, description="Pesquisar por marca, mod
 
     # Se nem fuzzy achou
     return {"mensagem": f"Nenhum carro encontrado com '{busca}'", "carros": [], "total": 0}
-
 @app.post("/favoritar/{usuario_id}")
 def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: Session = Depends(get_db)):
     """
@@ -250,15 +249,13 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
 
     # Caminho da planilha
     ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    caminho = os.path.join(ROOT_DIR, "data", "dados convertidos.xlsx")
+    caminho = os.path.join(ROOT_DIR, "data", "database.xlsx")
 
     if not os.path.exists(caminho):
         raise HTTPException(status_code=404, detail="Arquivo da planilha não encontrado")
 
     # Lê a planilha
     df = pd.read_excel(caminho)
-
-
 
     # Normaliza colunas: remove espaços, acentos, coloca lower
     df.columns = [
@@ -268,12 +265,21 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
         .replace("(", "")
         .replace(")", "")
         .replace("ç", "c")
+        .replace("ã", "a")
+        .replace("â", "a")
+        .replace("é", "e")
+        .replace("ê", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ô", "o")
+        .replace("ú", "u")
     for c in df.columns
     ]
 
     # Normaliza coluna de código
     if "codigo" not in df.columns:
         raise HTTPException(status_code=500, detail="Coluna 'codigo' ausente na planilha")
+
     df["codigo"] = df["codigo"].astype(str).str.strip()
     codigo = str(codigo).strip()
 
@@ -283,11 +289,13 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
         raise HTTPException(status_code=404, detail=f"Nenhum carro encontrado com código {codigo}")
     carro = carro[0]
 
-    print("Colunas normalizadas:", df.columns.tolist())
-    print("Chaves do carro encontrado:", carro.keys())
+    # --- Cria ou busca combustível ---
+    combustivel_tipo = carro.get("combustivel", "N/A")
+    if combustivel_tipo:
+        combustivel_tipo = combustivel_tipo.strip().upper()
+    else:
+        combustivel_tipo = "N/A"
 
-    # --- Cria ou busca combustível corretamente ---
-    combustivel_tipo = carro.get("combustível", "N/A").strip().upper()  # Ex: "F", "G"
     combustivel = db.query(Combustivel).filter(Combustivel.tipo == combustivel_tipo).first()
     if not combustivel:
         combustivel = Combustivel(tipo=combustivel_tipo)
@@ -295,17 +303,20 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
         db.commit()
         db.refresh(combustivel)
 
-    # --- Converte ar_condicionado para boolean ---
+    # --- Converte ar_condicionado ---
     ar_condicionado = carro.get("ar_condicionado", "N")
     if isinstance(ar_condicionado, str):
         ar_condicionado = ar_condicionado.strip().lower() in ["sim", "s", "true", "1"]
     else:
         ar_condicionado = bool(ar_condicionado)
 
-    # --- Converte direcao_assistida para Enum válido ---
+    # --- Converte direcao_assistida ---
     direcao_assistida = carro.get("direcao_assistida", "M")
     if direcao_assistida not in ["H", "E", "H-E", "M"]:
         direcao_assistida = "M"
+
+    # --- Lê o scoreFinal (Pontuação Final da planilha) ---
+    score_final = float(carro.get("pontuacao_final") or 0)
 
     # --- Cria ou busca veículo ---
     veiculo = db.query(Veiculo).filter_by(codigo=carro["codigo"]).first()
@@ -320,7 +331,8 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
             motor=carro.get("motor"),
             transmissao=carro.get("transmissao"),
             ar_condicionado=ar_condicionado,
-            direcao_assistida=direcao_assistida
+            direcao_assistida=direcao_assistida,
+            scoreFinal=score_final  # 👈 adiciona a pontuação
         )
         db.add(veiculo)
         db.commit()
@@ -330,12 +342,12 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
     emissao = Emissao(
         veiculo_id=veiculo.veiculo_id,
         combustivel_id=combustivel.combustivel_id,
-        nmhc=float(carro.get("emissão_de_nmhc_g/km") or 0),
-        co=float(carro.get("emissão_de_co_g/km") or 0),
-        nox=float(carro.get("emissão_de_nox_g/km") or 0),
+        nmhc=float(carro.get("emissao_de_nmhc_g/km") or 0),
+        co=float(carro.get("emissao_de_co_g/km") or 0),
+        nox=float(carro.get("emissao_de_nox_g/km") or 0),
         co2=float(
-            carro.get("emissão_de_co2_gás_efeito_estufa_a_produzido_pela_combustão_do_etanol_g/km")
-            or carro.get("emissão_de_co2_gás_efeito_estufa_a_produzido_pela_combustão_da_gasolina_ou_diesel__g/km")
+            carro.get("emissao_de_co2_gas_efeito_estufa_a_produzido_pela_combustao_do_etanol_g/km")
+            or carro.get("emissao_de_co2_gas_efeito_estufa_a_produzido_pela_combustao_da_gasolina_ou_diesel__g/km")
             or 0
         )
     )
@@ -355,7 +367,7 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
             or carro.get("rendimento_do_etanol_na_estrada_km/l")
             or 0
         ),
-        consumo_energetico=float(carro.get("consumo_energético_mj/km") or 0)
+        consumo_energetico=float(carro.get("consumo_energetico_mj/km") or 0)
     )
     db.add(consumo)
     db.commit()
@@ -371,8 +383,15 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
         msg = "Veículo adicionado aos favoritos."
 
     db.commit()
+    print("Colunas normalizadas:", df.columns.tolist())
 
-    return {"mensagem": msg}
+
+    return {
+        "mensagem": msg,
+        "veiculo_id": veiculo.veiculo_id,
+        "scoreFinal": score_final
+    }
+
 
 
 
@@ -441,3 +460,60 @@ def get_veiculos_favoritos(usuario_id: int, db: Session = Depends(get_db)):
         })
 
     return resultado
+    
+@app.get("/comparar-carros")
+def comparar_carros(id1: int, id2: int, db: Session = Depends(get_db)):
+    # Busca os veículos pelo ID correto (veiculo_id)
+    veiculo1 = db.query(Veiculo).filter(Veiculo.veiculo_id == id1).first()
+    veiculo2 = db.query(Veiculo).filter(Veiculo.veiculo_id == id2).first()
+
+    if not veiculo1 or not veiculo2:
+        raise HTTPException(status_code=404, detail="Um ou ambos os veículos não foram encontrados")
+
+    # Busca emissões e consumo associados
+    emissao1 = db.query(Emissao).filter(Emissao.veiculo_id == id1).first()
+    emissao2 = db.query(Emissao).filter(Emissao.veiculo_id == id2).first()
+
+    consumo1 = db.query(Consumo).filter(Consumo.veiculo_id == id1).first()
+    consumo2 = db.query(Consumo).filter(Consumo.veiculo_id == id2).first()
+
+    # Verificação de dados ausentes
+    if not emissao1 or not emissao2:
+        raise HTTPException(status_code=404, detail="Faltam dados de emissões para um dos veículos")
+    if not consumo1 or not consumo2:
+        raise HTTPException(status_code=404, detail="Faltam dados de consumo para um dos veículos")
+
+    # Retorna comparação
+    return {
+        "carro1": {
+            "marca": veiculo1.marca,
+            "modelo": veiculo1.modelo,
+            "ano": veiculo1.ano,
+            "versao": veiculo1.versao,
+            "combustivel_id": emissao1.combustivel_id,
+            "nmhc": float(emissao1.nmhc or 0),
+            "co": float(emissao1.co or 0),
+            "nox": float(emissao1.nox or 0),
+            "co2": float(emissao1.co2 or 0),
+            "rendimento_cidade": float(consumo1.rendimento_cidade or 0),
+            "rendimento_estrada": float(consumo1.rendimento_estrada or 0),
+            "consumo_energetico": float(consumo1.consumo_energetico or 0),
+            "scoreFinal": float(veiculo1.scoreFinal or 0),
+        },
+        "carro2": {
+            "marca": veiculo2.marca,
+            "modelo": veiculo2.modelo,
+            "ano": veiculo2.ano,
+            "versao": veiculo2.versao,
+            "combustivel_id": emissao2.combustivel_id,
+            "nmhc": float(emissao2.nmhc or 0),
+            "co": float(emissao2.co or 0),
+            "nox": float(emissao2.nox or 0),
+            "co2": float(emissao2.co2 or 0),
+            "rendimento_cidade": float(consumo2.rendimento_cidade or 0),
+            "rendimento_estrada": float(consumo2.rendimento_estrada or 0),
+            "consumo_energetico": float(consumo2.consumo_energetico or 0),
+            "scoreFinal": float(veiculo2.scoreFinal or 0),
+        }
+    }
+   
