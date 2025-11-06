@@ -41,7 +41,14 @@ class UsuarioResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
+        
+class UsuarioUpdate(BaseModel):
+    nome: str | None = None
+    senha: str | None = None
+    
+class EmailRequest(BaseModel):
+    email: str
+    
 class FavoritoCreate(BaseModel):
     usuario_id: int
     veiculo_id: int

@@ -11,7 +11,16 @@ import os
 from typing import Optional
 from backend.modelo import Combustivel, Consumo, Emissao, Favorito,Veiculo
 from backend.esquemas import VeiculoFavorito, FavoritoCreate
-import hashlib
+import requests
+import re
+import random
+import string
+import smtplib
+from email.mime.text import MIMEText
+from backend.esquemas import UsuarioCreate, UsuarioLogin,UsuarioUpdate
+from backend.esquemas import EmailRequest
+from backend.modelo import Usuario
+from fastapi.staticfiles import StaticFiles
 
 
 # cria tabelas (se ainda não criadas)
@@ -28,15 +37,49 @@ def get_db():
         db.close()
 
 # ---------- Rotas de usuário (suas já existentes) ----------
+DOMINIOS_PUBLICOS = [
+    "gmail.com", "yahoo.com", "hotmail.com", "outlook.com",
+    "icloud.com", "uol.com.br", "bol.com.br"
+]
+
+EMAIL_REGEX = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+
+app = FastAPI()
+
 @app.post("/cadastro", response_model=schemas.UsuarioResponse)
 def cadastro(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
+    # 1️⃣ Validar formato do e-mail via regex (extra)
+    if not re.match(EMAIL_REGEX, usuario.email):
+        raise HTTPException(status_code=400, detail="Formato de e-mail inválido")
+
+    # 2️⃣ Verificar se o e-mail já está cadastrado
     existe = db.query(models.Usuario).filter(models.Usuario.email == usuario.email).first()
     if existe:
         raise HTTPException(status_code=400, detail="E-mail já cadastrado")
-    novo = models.Usuario(nome=usuario.nome, email=usuario.email, senha=usuario.senha)
+
+    # 3️⃣ Verificação via API externa para domínios públicos
+    dominio = usuario.email.split("@")[-1].lower()
+    if dominio in DOMINIOS_PUBLICOS:
+        api_url = f"https://rapid-email-verifier.fly.dev/api/verify?email={usuario.email}"
+        try:
+            response = requests.get(api_url, timeout=5)
+            response.raise_for_status()
+            data = response.json()
+            if not data.get("valid", True):
+                raise HTTPException(status_code=400, detail="E-mail inválido ou inexistente")
+        except (requests.RequestException, ValueError):
+            print(f"⚠️ Falha na API de verificação para {usuario.email}. Cadastro continuará.")
+
+    # 4️⃣ Criar e salvar o novo usuário
+    novo = models.Usuario(
+        nome=usuario.nome,
+        email=usuario.email,
+        senha=usuario.senha
+    )
     db.add(novo)
     db.commit()
     db.refresh(novo)
+
     return novo
     
 @app.post("/login")
@@ -60,6 +103,151 @@ def listar_usuarios(db: Session = Depends(get_db)):
     return usuarios
 
 
+#---- editar email
+@app.put("/usuario/email")
+def atualizar_email_usuario(
+    usuario_id: int = Body(..., embed=True),
+    novo_email: str = Body(..., embed=True),
+    db: Session = Depends(get_db)
+):
+    usuario = db.query(models.Usuario).filter(models.Usuario.usuario_id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    if not novo_email or "@" not in novo_email:
+        raise HTTPException(status_code=400, detail="E-mail inválido")
+
+    usuario.email = novo_email.strip()
+    db.commit()
+    db.refresh(usuario)
+    return {"usuario_id": usuario.usuario_id, "email": usuario.email, "detail": "E-mail atualizado com sucesso"}
+
+@app.put("/usuario/senha")
+def atualizar_senha_usuario(
+    usuario_id: int = Body(..., embed=True),
+    nova_senha: str = Body(..., embed=True),
+    db: Session = Depends(get_db)
+):
+    usuario = db.query(models.Usuario).filter(models.Usuario.usuario_id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    if not nova_senha or len(nova_senha) < 6:
+        raise HTTPException(status_code=400, detail="Senha inválida. Mínimo 6 caracteres.")
+
+    usuario.senha = nova_senha.strip()  # Pode adicionar hash aqui
+    db.commit()
+    db.refresh(usuario)
+    return {"usuario_id": usuario.usuario_id, "detail": "Senha atualizada com sucesso"}
+
+@app.put("/usuario/nome")
+def atualizar_nome_usuario(
+    usuario_id: int = Body(..., embed=True),
+    novo_nome: str = Body(..., embed=True),
+    senha: str = Body(..., embed=True),
+    db: Session = Depends(get_db)
+):
+    usuario = db.query(models.Usuario).filter(models.Usuario.usuario_id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # Verifica se a senha bate
+    if usuario.senha != senha:  # Se estiver usando hash, usar bcrypt.checkpw()
+        raise HTTPException(status_code=401, detail="Senha incorreta")
+    
+    if not novo_nome or novo_nome.strip() == "":
+        raise HTTPException(status_code=400, detail="Nome inválido")
+    
+    usuario.nome = novo_nome.strip()
+    db.commit()
+    db.refresh(usuario)
+    
+    return {"usuario_id": usuario.usuario_id, "nome": usuario.nome, "detail": "Nome atualizado com sucesso"}
+
+#--- para deletra usuario----
+@app.delete("/usuario")
+def deletar_usuario_logado(
+    usuario_id: int = Body(..., embed=True),   # ID enviado pelo frontend
+    db: Session = Depends(get_db)
+):
+    usuario = db.query(models.Usuario).filter(models.Usuario.usuario_id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    db.delete(usuario)
+    db.commit()
+    return {"detail": "Seu usuário foi deletado com sucesso"}
+
+def gerar_senha(tamanho=8):
+    caracteres = string.ascii_letters + string.digits
+    return ''.join(random.choice(caracteres) for _ in range(tamanho))
+
+
+def enviar_email(destinatario: str, senha_nova: str):
+    """
+    Envia e-mail real se for Gmail. Para outros domínios, apenas simula.
+    """
+    remetente = "seuemail@gmail.com"  # seu e-mail Gmail real
+    senha_email = "ukbe prlx dzrp evzw"      # senha do app do Gmail
+
+    assunto = "Recuperação de senha"
+    corpo = f"""
+Olá,
+
+Você solicitou a recuperação da sua senha. Sua nova senha temporária é:
+
+{senha_nova}
+
+Recomendamos que você altere sua senha após o login.
+
+Atenciosamente,
+Sua Equipe
+"""
+
+    msg = MIMEText(corpo)
+    msg["Subject"] = assunto
+    msg["From"] = remetente
+    msg["To"] = destinatario
+
+    try:
+        # Se for Gmail, envia de verdade
+        if remetente.endswith("@gmail.com"):
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+                server.login(remetente, senha_email)
+                server.sendmail(remetente, destinatario, msg.as_string())
+            print(f"E-mail REAL enviado para {destinatario} ✅")
+        else:
+            # Para outros domínios, apenas simula
+            print(f"[SIMULAÇÃO] E-mail enviado para {destinatario}:\n{corpo}")
+    except Exception as e:
+        # Se houver erro, apenas simula e não quebra
+        print(f"Erro ao enviar e-mail para {destinatario}: {e}")
+        print(f"[SIMULAÇÃO] E-mail que não foi enviado:\n{corpo}")
+
+
+# ---------- Endpoint de recuperação de senha ----------
+@app.post("/recuperar-senha")
+def recuperar_senha(dados: EmailRequest, db: Session = Depends(get_db)):
+    email = dados.email
+
+    # Buscar usuário
+    usuario = db.query(Usuario).filter(Usuario.email == email).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="E-mail não cadastrado")
+
+    # Gerar nova senha
+    senha_nova = gerar_senha(10)
+    usuario.senha = senha_nova  # sem bcrypt
+    db.commit()
+
+    # Enviar ou simular envio de e-mail
+    enviar_email(email, senha_nova)
+
+    return {
+        "detail": f"Uma nova senha foi gerada para {email}. Verifique seu e-mail (ou console, se simulado)."
+    }
+    
+
 # ---------- Função utilitária ----------
 def find_col_insensitive(df: pd.DataFrame, candidates):
     """Retorna o nome da primeira coluna do df que contenha qualquer candidato (ignora maiúsculas e espaços)."""
@@ -70,6 +258,59 @@ def find_col_insensitive(df: pd.DataFrame, candidates):
         for k, orig in cols_norm.items():
             if key in k:
                 return orig
+    return None
+
+
+# -------------------------
+# Função auxiliar
+# -------------------------
+def pandas_to_json_safe(df: pd.DataFrame):
+    """Converte um DataFrame do Pandas para lista de dicionários pronta para JSON"""
+    df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
+    if "nota sobre os dados faltantes" in df.columns:
+        df = df.drop(columns=["nota sobre os dados faltantes"])
+
+    for col in df.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]).columns:
+        df[col] = df[col].apply(lambda x: x.isoformat() if x is not None else None)
+
+    return df.to_dict(orient="records")
+
+def find_col_insensitive(df: pd.DataFrame, possíveis: list[str]) -> Optional[str]:
+    """Encontra coluna no dataframe ignorando maiúsculas/minúsculas"""
+    for p in possíveis:
+        for c in df.columns:
+            if c.strip().lower() == p.strip().lower():
+                return c
+    return None
+
+def adicionar_imagem(df_in):
+    col_img = None
+    for c in df_in.columns:
+        if "imagem" in c.lower() or "foto" in c.lower():
+            col_img = c
+            break
+
+    resultados = pandas_to_json_safe(df_in)
+
+    if col_img:
+        for item in resultados:
+            filename = item.get(col_img)
+            if filename:
+                item["imagem_url"] = f"/imgs/{filename}"  # URL dinâmica
+            else:
+                item["imagem_url"] = None
+    return resultados
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+img_path = os.path.join(ROOT_DIR, "data", "image")
+app.mount("/imgs", StaticFiles(directory=img_path), name="imgs")
+
+def find_col_insensitive(df, candidates):
+    """Encontra coluna ignorando maiúsculas/minúsculas"""
+    for c in candidates:
+        for col in df.columns:
+            if col.lower() == c.lower():
+                return col
     return None
 
 
@@ -184,7 +425,6 @@ def pandas_to_json_safe(df: pd.DataFrame):
 #-------------------------
 @app.get("/carros")
 def listar_carros(busca: str = Query(None, description="Pesquisar por marca, modelo ou ano")):
-    ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     caminho = os.path.join(ROOT_DIR, "data", "database.xlsx")
 
     if not os.path.exists(caminho):
@@ -197,6 +437,12 @@ def listar_carros(busca: str = Query(None, description="Pesquisar por marca, mod
 
     # Normaliza colunas
     df.columns = [c.strip().lower() for c in df.columns]
+
+    if "ano" in df.columns:
+        df["ano"] = df["ano"].apply(
+            lambda x: str(int(x)) if pd.notnull(x) and str(x).replace(".", "", 1).isdigit() else str(x)
+        ).str.strip()
+
     for col in ["marca", "modelo", "ano", "codigo"]:
         if col not in df.columns:
             raise HTTPException(status_code=500, detail=f"Coluna '{col}' ausente na planilha")
@@ -204,7 +450,7 @@ def listar_carros(busca: str = Query(None, description="Pesquisar por marca, mod
 
     # Se não tem busca, retorna tudo
     if not busca:
-        return {"carros": pandas_to_json_safe(df), "total": len(df)}
+        return {"carros": adicionar_imagem(df), "total": len(df)}
 
     # Busca direta
     termos = busca.strip().upper().split()
@@ -220,7 +466,7 @@ def listar_carros(busca: str = Query(None, description="Pesquisar por marca, mod
 
     # Se achou, retorna
     if not df_filtrado.empty:
-        return {"carros": pandas_to_json_safe(df_filtrado), "total": len(df_filtrado)}
+        return {"carros": adicionar_imagem(df_filtrado), "total": len(df_filtrado)}
 
     # Se não achou → fuzzy match (marca, modelo ou ano)
     valores_validos = pd.concat([df["marca"], df["modelo"], df["ano"]]).unique()
@@ -234,12 +480,14 @@ def listar_carros(busca: str = Query(None, description="Pesquisar por marca, mod
         ]
         return {
             "mensagem": f"Nenhum carro encontrado com '{busca}', exibindo resultados semelhantes a '{sugestao}'",
-            "carros": pandas_to_json_safe(df_sugerido),
+            "carros": adicionar_imagem(df_sugerido),
             "total": len(df_sugerido)
         }
 
     # Se nem fuzzy achou
     return {"mensagem": f"Nenhum carro encontrado com '{busca}'", "carros": [], "total": 0}
+
+
 @app.post("/favoritar/{usuario_id}")
 def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: Session = Depends(get_db)):
     """

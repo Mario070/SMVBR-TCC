@@ -66,15 +66,43 @@ const TelaFavoritos = () => {
       }
     });
   };
+  
+  const handleComparar = async () => {
+  if (selecionados.length !== 2) {
+    Alert.alert("Seleção inválida", "Selecione exatamente 2 carros.");
+    return;
+  }
 
-  // 🔹 Navega para a tela de comparação
-  const handleComparar = () => {
-    if (selecionados.length !== 2) {
-      Alert.alert("Seleção inválida", "Selecione exatamente 2 carros.");
-      return;
+  try {
+    setCarregando(true);
+
+    const [id1, id2] = selecionados;
+
+    const response = await fetch(
+      `http://10.0.2.2:8000/comparar-carros?id1=${id1}&id2=${id2}`
+    );
+
+    if (!response.ok) {
+      throw new Error("Erro ao comparar carros");
     }
 
-  };
+    const dadosComparacao = await response.json();
+
+    // Navega para a tela de comparação usando objeto
+    router.push({
+      pathname: "/screens/telaComparar",
+      params: {
+        comparacao: JSON.stringify(dadosComparacao),
+      },
+    });
+
+  } catch (error) {
+    console.error("Erro ao comparar carros:", error);
+    Alert.alert("Erro", "Não foi possível comparar os carros.");
+  } finally {
+    setCarregando(false);
+  }
+};
 
   // 🔹 Renderiza cada card de veículo
   const renderizarFavorito = ({ item }: { item: any }) => {
