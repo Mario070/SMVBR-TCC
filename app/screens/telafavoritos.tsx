@@ -66,43 +66,43 @@ const TelaFavoritos = () => {
       }
     });
   };
-  
+
   const handleComparar = async () => {
-  if (selecionados.length !== 2) {
-    Alert.alert("Seleção inválida", "Selecione exatamente 2 carros.");
-    return;
-  }
-
-  try {
-    setCarregando(true);
-
-    const [id1, id2] = selecionados;
-
-    const response = await fetch(
-      `http://10.0.2.2:8000/comparar-carros?id1=${id1}&id2=${id2}`
-    );
-
-    if (!response.ok) {
-      throw new Error("Erro ao comparar carros");
+    if (selecionados.length !== 2) {
+      Alert.alert("Seleção inválida", "Selecione exatamente 2 carros.");
+      return;
     }
 
-    const dadosComparacao = await response.json();
+    try {
+      setCarregando(true);
 
-    // Navega para a tela de comparação usando objeto
-    router.push({
-      pathname: "/screens/telaComparar",
-      params: {
-        comparacao: JSON.stringify(dadosComparacao),
-      },
-    });
+      const [id1, id2] = selecionados;
 
-  } catch (error) {
-    console.error("Erro ao comparar carros:", error);
-    Alert.alert("Erro", "Não foi possível comparar os carros.");
-  } finally {
-    setCarregando(false);
-  }
-};
+      const response = await fetch(
+        `http://10.0.2.2:8000/comparar-carros?id1=${id1}&id2=${id2}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Erro ao comparar carros");
+      }
+
+      const dadosComparacao = await response.json();
+
+      // Navega para a tela de comparação usando objeto
+      router.push({
+        pathname: "/screens/telaComparar",
+        params: {
+          comparacao: JSON.stringify(dadosComparacao),
+        },
+      });
+
+    } catch (error) {
+      console.error("Erro ao comparar carros:", error);
+      Alert.alert("Erro", "Não foi possível comparar os carros.");
+    } finally {
+      setCarregando(false);
+    }
+  };
 
   // 🔹 Renderiza cada card de veículo
   const renderizarFavorito = ({ item }: { item: any }) => {
@@ -121,7 +121,30 @@ const TelaFavoritos = () => {
         <TouchableOpacity
           style={estilos.conteudoCarro}
           onPress={() => {
-            const carroString = encodeURIComponent(JSON.stringify(item));
+            // 🔹 Padroniza os nomes para o mesmo formato da Home
+            const carroPadronizado = {
+              veiculo_id: item.veiculo_id,
+              ano: item.ano,
+              categoria: item.categoria,
+              marca: item.marca,
+              modelo: item.modelo,
+              versao: item.versao,
+              motor: item.motor,
+              transmissao: item.transmissao,
+              ar_condicionado: item.ar_condicionado,
+              direcao_assistida: item.direcao_assistida,
+              combustivel: item.combustivel || item.Combustivel,
+              emissao_nmhc: item.emissao_nmhc ?? item.Emissao_NMHC,
+              emissao_co: item.emissao_co ?? item.Emissao_CO,
+              emissao_nox: item.emissao_nox ?? item.Emissao_NOx,
+              emissao_co2: item.emissao_co2 ?? item.Emissao_CO2,
+              rendimento_cidade: item.rendimento_cidade ?? item.Rendimento_Cidade,
+              rendimento_estrada: item.rendimento_estrada ?? item.Rendimento_Estrada,
+              consumo_energetico: item.consumo_energetico ?? item.Consumo_Energetico,
+            };
+
+            const carroString = encodeURIComponent(JSON.stringify(carroPadronizado));
+
             router.push({
               pathname: "/detalhes/[id]",
               params: {
@@ -130,6 +153,7 @@ const TelaFavoritos = () => {
               },
             });
           }}
+
 
 
 

@@ -82,28 +82,35 @@ const DetalhesCarro = () => {
   }
 
   // ✅ Normalização dos campos com base no backend
-  const campos = {
-    ano: carro['ano'] ?? 'N/A',
-    categoria: carro['categoria'] ?? 'N/A',
-    marca: carro['marca'] ?? 'N/A',
-    modelo: carro['modelo'] ?? 'N/A',
-    versao: carro['versao'] ?? 'N/A',
-    motor: carro['motor'] ?? 'N/A',
-    transmissao: carro['transmissao'] ?? 'N/A',
-    arCondicionado: carro['ar-condicionado'] ?? 'N/A',
-    direcaoAssistida: carro['direçao assistida'] ?? 'N/A',
-    combustivel: carro['combustivel'] ?? carro['combustível'] ?? 'N/A', // ✅ Correção do combustível
-    nmhc: carro['emissão de nmhc (g/km)'] ?? 'N/A',
-    co: carro['emissão de co (g/km)'] ?? 'N/A',
-    nox: carro['emissão de nox (g/km)'] ?? 'N/A',
-    co2Etanol: carro['Emissão de CO2 (g/km) '] ?? 'N/A',
-    rendEtanolCidade: carro['rendimento do etanol na cidade (km/l)'] ?? 'N/A',
-    rendEtanolEstrada: carro['rendimento do etanol na estrada (km/l)'] ?? 'N/A',
-    rendGasCidade: carro['rendimento da gasolina ou diesel na cidade (km/l)'] ?? 'N/A',
-    rendGasEstrada: carro['rendimento da gasolina ou diesel estrada (km/l)'] ?? 'N/A',
-    consumoEnergetico: carro['consumo energético (mj/km)'] ?? 'N/A',
-    imagem: carro['imagem'] ?? 'https://cdn-icons-png.flaticon.com/512/744/744465.png',
-  };
+ const campos = {
+  ano: carro['ano'] ?? 'N/A',
+  categoria: carro['categoria'] ?? 'N/A',
+  marca: carro['marca'] ?? 'N/A',
+  modelo: carro['modelo'] ?? 'N/A',
+  versao: carro['versao'] ?? 'N/A',
+  motor: carro['motor'] ?? 'N/A',
+  transmissao: carro['transmissao'] ?? 'N/A',
+  arCondicionado: carro['ar-condicionado'] ?? carro['ar_condicionado'] ?? 'N/A',
+  direcaoAssistida: carro['direçao assistida'] ?? carro['direcao_assistida'] ?? 'N/A',
+
+  combustivel: carro['combustivel'] ?? carro['combustível'] ?? 'N/A',
+
+  // ✅ Emissões — cobre os dois formatos (Home e Favoritos)
+  nmhc: carro['emissão de nmhc (g/km)'] ?? carro['emissao_nmhc'] ?? 'N/A',
+  co: carro['emissão de co (g/km)'] ?? carro['emissao_co'] ?? 'N/A',
+  nox: carro['emissão de nox (g/km)'] ?? carro['emissao_nox'] ?? 'N/A',
+  co2Etanol: carro['Emissão de CO2 (g/km) '] ?? carro['emissao_co2'] ?? 'N/A',
+
+  // ✅ Consumo — cobre os dois formatos também
+  rendEtanolCidade: carro['rendimento do etanol na cidade (km/l)'] ?? carro['rendimento_cidade'] ?? 'N/A',
+  rendEtanolEstrada: carro['rendimento do etanol na estrada (km/l)'] ?? carro['rendimento_estrada'] ?? 'N/A',
+  rendGasCidade: carro['rendimento da gasolina ou diesel na cidade (km/l)'] ?? carro['rendimento_cidade'] ?? 'N/A',
+  rendGasEstrada: carro['rendimento da gasolina ou diesel estrada (km/l)'] ?? carro['rendimento_estrada'] ?? 'N/A',
+  consumoEnergetico: carro['consumo energético (mj/km)'] ?? carro['consumo_energetico'] ?? 'N/A',
+
+  imagem: carro['imagem'] ?? 'https://cdn-icons-png.flaticon.com/512/744/744465.png',
+};
+
 
   // Traduções
   const traduzirDirecao = (valor: string) => {
