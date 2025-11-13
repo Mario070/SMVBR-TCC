@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -29,20 +28,17 @@ const DetalhesCarro = () => {
         if (carroParam) {
           try {
             const parsed = JSON.parse(decodeURIComponent(String(carroParam)));
-
-            // 🔄 Normaliza as chaves do objeto (tudo para minúsculas)
-            const normalizado = Object.keys(parsed).reduce((acc: any, key: string) => {
+            // Normaliza chaves para minúsculas
+            const normalizado = Object.keys(parsed).reduce((acc: any, key) => {
               acc[key.toLowerCase()] = parsed[key];
               return acc;
             }, {});
-
             setCarro(normalizado);
             return;
           } catch (e) {
             console.warn('Falha ao parsear carro dos params:', e);
           }
         }
-
 
         if (id) {
           const resp = await fetch(`http://10.0.2.2:8000/carros/${id}`);
@@ -61,6 +57,87 @@ const DetalhesCarro = () => {
     };
     init();
   }, [id, carroParam]);
+
+  // Função para decidir qual imagem mostrar (robusta)
+const getImagemVeiculo = () => {
+  const urlBanco = carro?.imagem_url;
+  const urlPlanilha = carro?.imagem_planilha;
+
+  const isInvalida = (url?: string) => {
+    if (!url) return true; // null, undefined
+    const u = url.trim().toLowerCase();
+    return (
+      u === '' ||
+      u === 'nan' ||
+      u === '/nan' ||
+      u === 'imgs/nan' ||
+      u === '/imgs/nan' ||
+      u.includes('nan') // pega qualquer caso residual tipo imgs/nan ou imagens/nan
+    );
+  };
+
+  if (!isInvalida(urlBanco)) {
+    return urlBanco!.startsWith('http')
+      ? urlBanco!
+      : `http://10.0.2.2:8000${urlBanco!.startsWith('/') ? urlBanco! : '/' + urlBanco!}`;
+  }
+
+  if (!isInvalida(urlPlanilha)) {
+    return urlPlanilha!.startsWith('http')
+      ? urlPlanilha!
+      : `http://10.0.2.2:8000${urlPlanilha!.startsWith('/') ? urlPlanilha! : '/' + urlPlanilha!}`;
+  }
+
+  // fallback fixo
+  return 'https://cdn-icons-png.flaticon.com/512/744/744465.png';
+};
+
+
+
+
+
+  // Normalização dos campos do carro
+  const campos = {
+    ano: carro?.ano ?? 'N/A',
+    categoria: carro?.categoria ?? 'N/A',
+    marca: carro?.marca ?? 'N/A',
+    modelo: carro?.modelo ?? 'N/A',
+    versao: carro?.versao ?? 'N/A',
+    motor: carro?.motor ?? 'N/A',
+    transmissao: carro?.transmissao ?? 'N/A',
+    arCondicionado: carro?.['ar-condicionado'] ?? carro?.ar_condicionado ?? 'N/A',
+    direcaoAssistida: carro?.['direcao assistida'] ?? carro?.direcao_assistida ?? 'N/A',
+    combustivel: carro?.combustivel ?? carro?.combustível ?? 'N/A',
+    nmhc: carro?.['emissao_nmhc'] ?? carro?.['emissão de nmhc (g/km)'] ?? 'N/A',
+    co: carro?.['emissao_co'] ?? carro?.['emissão de co (g/km)'] ?? 'N/A',
+    nox: carro?.['emissao_nox'] ?? carro?.['emissão de nox (g/km)'] ?? 'N/A',
+    co2: carro?.['emissao_co2'] ?? carro?.['emissão de co2 (g/km)'] ?? 'N/A',
+    rendEtanolCidade: carro?.['rendimento_cidade'] ?? carro?.['rendimento do etanol na cidade (km/l)'] ?? 'N/A',
+    rendEtanolEstrada: carro?.['rendimento_estrada'] ?? carro?.['rendimento do etanol na estrada (km/l)'] ?? 'N/A',
+    rendGasCidade: carro?.['rendimento_cidade'] ?? carro?.['rendimento da gasolina ou diesel na cidade (km/l)'] ?? 'N/A',
+    rendGasEstrada: carro?.['rendimento_estrada'] ?? carro?.['rendimento da gasolina ou diesel estrada (km/l)'] ?? 'N/A',
+    consumoEnergetico: carro?.['consumo_energetico'] ?? carro?.['consumo energético (mj/km)'] ?? 'N/A',
+  };
+
+  const traduzirDirecao = (valor: string) => {
+    switch (valor?.toUpperCase()) {
+      case 'H': return 'Hidráulica';
+      case 'E': return 'Elétrica';
+      case 'H-E': return 'Eletro-hidráulica';
+      case 'M': return 'Mecânica';
+      default: return valor || 'N/A';
+    }
+  };
+
+  const traduzirCombustivel = (valor: string) => {
+    switch (valor?.toUpperCase()) {
+      case 'G': return 'Gasolina';
+      case 'E': return 'Etanol';
+      case 'D': return 'Diesel';
+      case 'F': return 'Flex';
+      default: return valor || 'N/A';
+    }
+  };
 
   if (carregando) {
     return (
@@ -82,65 +159,6 @@ const DetalhesCarro = () => {
     );
   }
 
-  // ✅ Normalização dos campos com base no backend
- const campos = {
-  ano: carro['ano'] ?? 'N/A',
-  categoria: carro['categoria'] ?? 'N/A',
-  marca: carro['marca'] ?? 'N/A',
-  modelo: carro['modelo'] ?? 'N/A',
-  versao: carro['versao'] ?? 'N/A',
-  motor: carro['motor'] ?? 'N/A',
-  transmissao: carro['transmissao'] ?? 'N/A',
-  arCondicionado: carro['ar-condicionado'] ?? carro['ar_condicionado'] ?? 'N/A',
-  direcaoAssistida: carro['direçao assistida'] ?? carro['direcao_assistida'] ?? 'N/A',
-
-  combustivel: carro['combustivel'] ?? carro['combustível'] ?? 'N/A',
-
-  // ✅ Emissões — cobre os dois formatos (Home e Favoritos)
-  nmhc: carro['emissão de nmhc (g/km)'] ?? carro['emissao_nmhc'] ?? 'N/A',
-  co: carro['emissão de co (g/km)'] ?? carro['emissao_co'] ?? 'N/A',
-  nox: carro['emissão de nox (g/km)'] ?? carro['emissao_nox'] ?? 'N/A',
-  co2Etanol: carro['Emissão de CO2 (g/km) '] ?? carro['emissao_co2'] ?? 'N/A',
-
-  // ✅ Consumo — cobre os dois formatos também
-  rendEtanolCidade: carro['rendimento do etanol na cidade (km/l)'] ?? carro['rendimento_cidade'] ?? 'N/A',
-  rendEtanolEstrada: carro['rendimento do etanol na estrada (km/l)'] ?? carro['rendimento_estrada'] ?? 'N/A',
-  rendGasCidade: carro['rendimento da gasolina ou diesel na cidade (km/l)'] ?? carro['rendimento_cidade'] ?? 'N/A',
-  rendGasEstrada: carro['rendimento da gasolina ou diesel estrada (km/l)'] ?? carro['rendimento_estrada'] ?? 'N/A',
-  consumoEnergetico: carro['consumo energético (mj/km)'] ?? carro['consumo_energetico'] ?? 'N/A',
-
- 
-  imagem:
-  carro['imagem_url']
-    ? carro['imagem_url'].startsWith('http')
-      ? carro['imagem_url'] // vem da planilha (URL completa)
-      : `http://10.0.2.2:8000${carro['imagem_url']}` // vem do backend (caminho relativo)
-    : 'https://cdn-icons-png.flaticon.com/512/744/744465.png',
-
-};
-
-
-  // Traduções
-  const traduzirDirecao = (valor: string) => {
-    switch (valor?.toUpperCase()) {
-      case 'H': return 'Hidráulica';
-      case 'E': return 'Elétrica';
-      case 'H-E': return 'Eletro-hidráulica';
-      case 'M': return 'Mecânica';
-      default: return valor || 'N/A';
-    }
-  };
-
-  const traduzirCombustivel = (valor: string) => {
-    switch (valor?.toUpperCase()) {
-      case 'G': return 'Gasolina';
-      case 'E': return 'Etanol';
-      case 'D': return 'Diesel';
-      case 'F': return 'Flex';
-      default: return valor || 'N/A';
-    }
-  };
-
   return (
     <ScrollView style={estilos.container}>
       <View style={estilos.barraSuperior}>
@@ -152,12 +170,8 @@ const DetalhesCarro = () => {
       </View>
 
       <View style={estilos.imagemContainer}>
-        <Image source={{ uri: campos.imagem }} style={estilos.imagemGrande} />
-        <TouchableOpacity style={estilos.botaoFavorito} onPress={() => {
-          // Aqui você pode adicionar lógica para favoritar/desfavoritar a aproveita 
-          // e ja fazer a logica para quando adiconar no favorito ele ficar marcado 
-          console.log('Alternar favorito');
-        }}>
+        <Image source={{ uri: getImagemVeiculo() }} style={estilos.imagemGrande} resizeMode="contain" />
+        <TouchableOpacity style={estilos.botaoFavorito} onPress={() => console.log('Alternar favorito')}>
           <Ionicons name="heart" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -185,7 +199,7 @@ const DetalhesCarro = () => {
           nmhc: campos.nmhc,
           co: campos.co,
           nox: campos.nox,
-          co2: campos.co2Etanol,
+          co2: campos.co2,
           rendEtanolCidade: campos.rendEtanolCidade,
           rendEtanolEstrada: campos.rendEtanolEstrada,
           rendGasCidade: campos.rendGasCidade,
@@ -210,35 +224,18 @@ const estilos = StyleSheet.create({
   infoPrincipal: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 16 },
   nomeCarro: { fontSize: 20, fontWeight: 'bold', color: '#000', marginBottom: 4 },
   subtituloCarro: { fontSize: 16, color: '#666' },
-
-  imagemContainer: {
-    position: 'relative',
-    marginBottom: 16,
-  },
-  botaoFavorito: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 20,
-    padding: 6,
-    zIndex: 1,
-  },
-
+  imagemContainer: { position: 'relative', marginBottom: 16 },
+  botaoFavorito: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0, 0, 0, 0.5)', borderRadius: 20, padding: 6, zIndex: 1 },
   secaoDetalhes: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginTop: 16 },
   tituloSecao: { fontSize: 18, fontWeight: 'bold', color: '#000', marginBottom: 12 },
   linhaDetalhe: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   rotulo: { color: '#666', fontSize: 15 },
   valor: { color: '#000', fontSize: 15, fontWeight: '500' },
-
   secaoSustentabilidade: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginTop: 16 },
-
   textoCarregando: { textAlign: 'center', marginTop: 20, fontSize: 16, color: '#666' },
   textoErro: { textAlign: 'center', marginTop: 20, fontSize: 16, color: '#f44336' },
   botaoVoltar: { backgroundColor: '#2196F3', padding: 12, borderRadius: 8, marginTop: 20, alignSelf: 'center' },
   textoBotao: { color: '#fff', fontWeight: 'bold' },
-
 });
 
 export default DetalhesCarro;
-

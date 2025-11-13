@@ -21,6 +21,7 @@ from backend.esquemas import UsuarioCreate, UsuarioLogin,UsuarioUpdate
 from backend.esquemas import EmailRequest
 from backend.modelo import Usuario
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 
 
 # cria tabelas (se ainda não criadas)
@@ -782,5 +783,9 @@ def comparar_carros(id1: int, id2: int, db: Session = Depends(get_db)):
         }
     }
    
+@app.get("/imgs/nan")
+async def imagem_nan_fallback():
+    # Redireciona para o ícone padrão
+    return RedirectResponse("https://cdn-icons-png.flaticon.com/512/744/744465.png")
 
 

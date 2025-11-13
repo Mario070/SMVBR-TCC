@@ -14,12 +14,34 @@ import { Ionicons } from "@expo/vector-icons";
 import { Checkbox } from "react-native-paper";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// Componente para tratar imagem com fallback
+const ImagemVeiculo = ({ url }: { url: string }) => {
+  const [erro, setErro] = useState(false);
+
+  const imagemUri =
+    !erro &&
+    url &&
+    url.toLowerCase() !== "imgs/nan" &&
+    url.toLowerCase() !== "imagens/nan"
+      ? `http://10.0.2.2:8000${url.startsWith("/") ? "" : "/"}${url}`
+      : "https://cdn-icons-png.flaticon.com/512/744/744465.png";
+
+  return (
+    <Image
+      source={{ uri: imagemUri }}
+      style={styles.imagemCarro}
+      resizeMode="cover"
+      onError={() => setErro(true)}
+    />
+  );
+};
+
 const TelaFavoritos = () => {
   const [favoritos, setFavoritos] = useState<any[]>([]);
   const [selecionados, setSelecionados] = useState<number[]>([]);
   const [carregando, setCarregando] = useState(true);
 
-  // 🔹 Busca os favoritos do usuário logado
+  // 🔹 Carrega favoritos do usuário
   useEffect(() => {
     const carregarFavoritos = async () => {
       try {
@@ -36,14 +58,12 @@ const TelaFavoritos = () => {
           `http://10.0.2.2:8000/veiculos_favoritos/${usuarioId}`
         );
 
-        if (!response.ok) {
-          throw new Error("Erro ao buscar veículos favoritos");
-        }
+        if (!response.ok) throw new Error("Erro ao buscar veículos favoritos");
 
         const data = await response.json();
         setFavoritos(data);
       } catch (error) {
-        console.error("Erro ao carregar favoritos:", error);
+        console.error(error);
         Alert.alert("Erro", "Não foi possível carregar os favoritos.");
       } finally {
         setCarregando(false);
@@ -53,20 +73,19 @@ const TelaFavoritos = () => {
     carregarFavoritos();
   }, []);
 
-  // 🔹 Alterna a seleção de carros (máx. 2)
+  // 🔹 Seleção de carros (máx. 2)
   const toggleSelecao = (id: number) => {
     setSelecionados((prev) => {
-      if (prev.includes(id)) {
-        return prev.filter((item) => item !== id);
-      } else if (prev.length < 2) {
-        return [...prev, id];
-      } else {
+      if (prev.includes(id)) return prev.filter((item) => item !== id);
+      if (prev.length >= 2) {
         Alert.alert("Limite atingido", "Você só pode comparar até 2 carros.");
         return prev;
       }
+      return [...prev, id];
     });
   };
 
+  // 🔹 Comparar carros
   const handleComparar = async () => {
     if (selecionados.length !== 2) {
       Alert.alert("Seleção inválida", "Selecione exatamente 2 carros.");
@@ -75,47 +94,33 @@ const TelaFavoritos = () => {
 
     try {
       setCarregando(true);
-
       const [id1, id2] = selecionados;
 
       const response = await fetch(
         `http://10.0.2.2:8000/comparar-carros?id1=${id1}&id2=${id2}`
       );
 
-      if (!response.ok) {
-        throw new Error("Erro ao comparar carros");
-      }
+      if (!response.ok) throw new Error("Erro ao comparar carros");
 
       const dadosComparacao = await response.json();
 
-      // Navega para a tela de comparação usando objeto
       router.push({
         pathname: "/screens/telaComparar",
-        params: {
-          comparacao: JSON.stringify(dadosComparacao),
-        },
+        params: { comparacao: JSON.stringify(dadosComparacao) },
       });
-
     } catch (error) {
-      console.error("Erro ao comparar carros:", error);
+      console.error(error);
       Alert.alert("Erro", "Não foi possível comparar os carros.");
     } finally {
       setCarregando(false);
     }
   };
 
-  // 🔹 Renderiza cada card de veículo
+  // 🔹 Renderiza cada carro favorito
   const renderizarFavorito = ({ item }: { item: any }) => {
-    const imagemUri =
-     item.imagem_url
-     ? `http://10.0.2.2:8000${item.imagem_url}`
-      : "https://cdn-icons-png.flaticon.com/512/744/744465.png";
-
-    console.log(item.imagem_url)
-
     return (
-      <View style={estilos.cartaoCarro}>
-        <View style={estilos.checkboxContainer}>
+      <View style={styles.cartaoCarro}>
+        <View style={styles.checkboxContainer}>
           <Checkbox
             status={selecionados.includes(item.veiculo_id) ? "checked" : "unchecked"}
             onPress={() => toggleSelecao(item.veiculo_id)}
@@ -123,57 +128,33 @@ const TelaFavoritos = () => {
         </View>
 
         <TouchableOpacity
-          style={estilos.conteudoCarro}
+          style={styles.conteudoCarro}
           onPress={() => {
-            // 🔹 Padroniza os nomes para o mesmo formato da Home
             const carroPadronizado = {
-              veiculo_id: item.veiculo_id,
-              ano: item.ano,
-              categoria: item.categoria,
-              marca: item.marca,
-              modelo: item.modelo,
-              versao: item.versao,
-              motor: item.motor,
-              transmissao: item.transmissao,
-              ar_condicionado: item.ar_condicionado,
-              direcao_assistida: item.direcao_assistida,
-              combustivel: item.combustivel || item.Combustivel,
-              emissao_nmhc: item.emissao_nmhc ?? item.Emissao_NMHC,
-              emissao_co: item.emissao_co ?? item.Emissao_CO,
-              emissao_nox: item.emissao_nox ?? item.Emissao_NOx,
-              emissao_co2: item.emissao_co2 ?? item.Emissao_CO2,
-              rendimento_cidade: item.rendimento_cidade ?? item.Rendimento_Cidade,
-              rendimento_estrada: item.rendimento_estrada ?? item.Rendimento_Estrada,
-              consumo_energetico: item.consumo_energetico ?? item.Consumo_Energetico,
-              imagem_url: item.imagem_url
-              ? `http://10.0.2.2:8000${item.imagem_url}`
-              : "https://cdn-icons-png.flaticon.com/512/744/744465.png",
+              ...item,
+              imagem_url:
+                item.imagem_url &&
+                item.imagem_url.toLowerCase() !== "imgs/nan" &&
+                item.imagem_url.toLowerCase() !== "imagens/nan"
+                  ? `http://10.0.2.2:8000${item.imagem_url.startsWith("/") ? "" : "/"}${item.imagem_url}`
+                  : "https://cdn-icons-png.flaticon.com/512/744/744465.png",
             };
 
             const carroString = encodeURIComponent(JSON.stringify(carroPadronizado));
 
             router.push({
               pathname: "/detalhes/[id]",
-              params: {
-                id: String(item.veiculo_id),
-                carro: carroString,
-              },
+              params: { id: String(item.veiculo_id), carro: carroString },
             });
           }}
-
-
-
-
         >
-          <Image source={{ uri: imagemUri }} style={estilos.imagemCarro} />
-          <Text style={estilos.nomeCarro}>
+          <ImagemVeiculo url={item.imagem_url} />
+          <Text style={styles.nomeCarro}>
             {item.marca} {item.modelo}
           </Text>
-          <Text style={estilos.precoCarro}>Ano: {item.ano}</Text>
+          <Text style={styles.precoCarro}>Ano: {item.ano}</Text>
           {item.tipo_combustivel && (
-            <Text style={estilos.precoCarro}>
-              Combustível: {item.tipo_combustivel}
-            </Text>
+            <Text style={styles.precoCarro}>Combustível: {item.tipo_combustivel}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -181,13 +162,13 @@ const TelaFavoritos = () => {
   };
 
   return (
-    <View style={estilos.container}>
-      <Text style={estilos.titulo}>Carros Favoritos</Text>
+    <View style={styles.container}>
+      <Text style={styles.titulo}>Carros Favoritos</Text>
 
       {carregando ? (
-        <View style={estilos.centralizar}>
+        <View style={styles.centralizar}>
           <ActivityIndicator size="large" color="#2196F3" />
-          <Text style={estilos.textoCarregando}>Carregando...</Text>
+          <Text style={styles.textoCarregando}>Carregando...</Text>
         </View>
       ) : (
         <>
@@ -196,57 +177,47 @@ const TelaFavoritos = () => {
             renderItem={renderizarFavorito}
             keyExtractor={(item) => String(item.veiculo_id)}
             numColumns={2}
-            contentContainerStyle={estilos.conteudoFlatList}
+            contentContainerStyle={styles.conteudoFlatList}
             ListEmptyComponent={
-              <View style={estilos.centralizar}>
-                <Text style={estilos.textoVazio}>Nenhum carro favorito ainda.</Text>
+              <View style={styles.centralizar}>
+                <Text style={styles.textoVazio}>Nenhum carro favorito ainda.</Text>
               </View>
             }
           />
 
-          {/* 🔹 Botão de Comparar */}
           <TouchableOpacity
-            style={[
-              estilos.botaoComparar,
-              { opacity: selecionados.length === 2 ? 1 : 0.5 },
-            ]}
+            style={[styles.botaoComparar, { opacity: selecionados.length === 2 ? 1 : 0.5 }]}
             disabled={selecionados.length !== 2}
             onPress={handleComparar}
           >
             <Ionicons name="swap-horizontal" size={20} color="#fff" />
-            <Text style={estilos.textoBotaoComparar}>
+            <Text style={styles.textoBotaoComparar}>
               Comparar ({selecionados.length}/2)
             </Text>
           </TouchableOpacity>
         </>
       )}
 
-      {/* 🔹 Barra de Navegação Inferior */}
-      <View style={estilos.barraNavegacao}>
-        <TouchableOpacity
-          style={estilos.iconeNavegacao}
-          onPress={() => router.push("/screens/home")}
-        >
+      {/* Barra de navegação inferior */}
+      <View style={styles.barraNavegacao}>
+        <TouchableOpacity style={styles.iconeNavegacao} onPress={() => router.push("/screens/home")}>
           <Ionicons name="home" size={24} color="#2196F3" />
-          <Text style={estilos.textoNavegacaoAtivo}>Início</Text>
+          <Text style={styles.textoNavegacaoAtivo}>Início</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={estilos.iconeNavegacao}
-          onPress={() => router.push("/screens/telafavoritos")}
-        >
+        <TouchableOpacity style={styles.iconeNavegacao} onPress={() => router.push("/screens/telafavoritos")}>
           <Ionicons name="heart" size={24} color="#888" />
-          <Text style={estilos.textoNavegacao}>Favoritos</Text>
+          <Text style={styles.textoNavegacao}>Favoritos</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={estilos.iconeNavegacao}>
+        <TouchableOpacity style={styles.iconeNavegacao}>
           <Ionicons name="person" size={24} color="#888" />
-          <Text style={estilos.textoNavegacao}>Perfil</Text>
+          <Text style={styles.textoNavegacao}>Perfil</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={estilos.iconeNavegacao}>
+        <TouchableOpacity style={styles.iconeNavegacao}>
           <Ionicons name="settings" size={24} color="#888" />
-          <Text style={estilos.textoNavegacao}>Config.</Text>
+          <Text style={styles.textoNavegacao}>Config.</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -255,20 +226,10 @@ const TelaFavoritos = () => {
 
 export default TelaFavoritos;
 
-// ✅ Usa exatamente seus estilos originais
-const estilos = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    padding: 16,
-  },
-  titulo: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 16,
-    textAlign: "center",
-    color: "#000",
-  },
+// 🔹 Estilos
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#FFFFFF", padding: 16 },
+  titulo: { fontSize: 20, fontWeight: "bold", marginBottom: 16, textAlign: "center", color: "#000" },
   cartaoCarro: {
     width: "45%",
     margin: "2.5%",
@@ -282,34 +243,12 @@ const estilos = StyleSheet.create({
     shadowRadius: 2,
     position: "relative",
   },
-  checkboxContainer: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    zIndex: 1,
-  },
-  conteudoCarro: {
-    flex: 1,
-  },
-  imagemCarro: {
-    width: "100%",
-    height: 100,
-  },
-  nomeCarro: {
-    padding: 8,
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#000",
-  },
-  precoCarro: {
-    paddingHorizontal: 8,
-    paddingBottom: 8,
-    fontSize: 14,
-    color: "#2196F3",
-  },
-  conteudoFlatList: {
-    paddingBottom: 80,
-  },
+  checkboxContainer: { position: "absolute", top: 8, right: 8, zIndex: 1 },
+  conteudoCarro: { flex: 1 },
+  imagemCarro: { width: "100%", height: 100, backgroundColor: "#f0f0f0" },
+  nomeCarro: { padding: 8, fontSize: 14, fontWeight: "bold", color: "#000" },
+  precoCarro: { paddingHorizontal: 8, paddingBottom: 8, fontSize: 14, color: "#2196F3" },
+  conteudoFlatList: { paddingBottom: 80 },
   botaoComparar: {
     position: "absolute",
     bottom: 80,
@@ -323,26 +262,10 @@ const estilos = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  textoBotaoComparar: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  centralizar: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  textoCarregando: {
-    marginTop: 10,
-    fontSize: 16,
-    color: "#666",
-  },
-  textoVazio: {
-    fontSize: 16,
-    color: "#999",
-    textAlign: "center",
-  },
+  textoBotaoComparar: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  centralizar: { flex: 1, justifyContent: "center", alignItems: "center" },
+  textoCarregando: { marginTop: 10, fontSize: 16, color: "#666" },
+  textoVazio: { fontSize: 16, color: "#999", textAlign: "center" },
   barraNavegacao: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -357,19 +280,7 @@ const estilos = StyleSheet.create({
     right: 0,
     paddingHorizontal: 16,
   },
-  iconeNavegacao: {
-    alignItems: "center",
-    flex: 1,
-  },
-  textoNavegacao: {
-    fontSize: 12,
-    color: "#888",
-    marginTop: 4,
-  },
-  textoNavegacaoAtivo: {
-    fontSize: 12,
-    color: "#2196F3",
-    fontWeight: "bold",
-    marginTop: 4,
-  },
+  iconeNavegacao: { alignItems: "center", flex: 1 },
+  textoNavegacao: { fontSize: 12, color: "#888", marginTop: 4 },
+  textoNavegacaoAtivo: { fontSize: 12, color: "#2196F3", fontWeight: "bold", marginTop: 4 },
 });
