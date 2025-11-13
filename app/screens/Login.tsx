@@ -33,7 +33,7 @@ export default function Login() {
 
       if (response.ok) {
         const usuarioNome = Array.isArray(data.nome) ? data.nome[0] : data.nome;
-      const message = Array.isArray(data.message) ?     data.message[0] : data.message;
+        const message = Array.isArray(data.message) ? data.message[0] : data.message;
 
         // ✅ Salva os dados do usuário localmente
         await AsyncStorage.setItem("usuario_id", String(data.usuario_id));
@@ -87,9 +87,24 @@ export default function Login() {
         <Text style={styles.link}>Não tem conta? Cadastre-se</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={() => router.push("/screens/home")}>
+      <TouchableOpacity
+        onPress={async () => {
+          try {
+            // 🔹 Remove qualquer dado de login antes de continuar sem login
+            await AsyncStorage.removeItem("usuario_id");
+            await AsyncStorage.removeItem("usuario_nome");
+            console.log("Dados do usuário removidos — modo visitante ativo.");
+          } catch (error) {
+            console.error("Erro ao limpar dados do usuário:", error);
+          }
+
+          // Depois redireciona normalmente
+          router.push("/screens/home");
+        }}
+      >
         <Text style={styles.link}>Continuar sem Login</Text>
       </TouchableOpacity>
+
     </View>
   );
 }

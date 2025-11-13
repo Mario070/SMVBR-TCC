@@ -487,6 +487,11 @@ def listar_carros(busca: str = Query(None, description="Pesquisar por marca, mod
     # Se nem fuzzy achou
     return {"mensagem": f"Nenhum carro encontrado com '{busca}'", "carros": [], "total": 0}
 
+from fastapi import HTTPException, Body, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+import os
+import pandas as pd
 
 @app.post("/favoritar/{usuario_id}")
 def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: Session = Depends(get_db)):
@@ -586,42 +591,58 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
         db.commit()
         db.refresh(veiculo)
 
-    # --- Cria emissões ---
-    emissao = Emissao(
+    # --- Cria emissões se ainda não existir ---
+    emissao_existente = db.query(Emissao).filter_by(
         veiculo_id=veiculo.veiculo_id,
-        combustivel_id=combustivel.combustivel_id,
-        nmhc=float(carro.get("emissao_de_nmhc_g/km") or 0),
-        co=float(carro.get("emissao_de_co_g/km") or 0),
-        nox=float(carro.get("emissao_de_nox_g/km") or 0),
-        co2=float(
-            carro.get("emissao_de_co2_gas_efeito_estufa_a_produzido_pela_combustao_do_etanol_g/km")
-            or carro.get("emissao_de_co2_gas_efeito_estufa_a_produzido_pela_combustao_da_gasolina_ou_diesel__g/km")
-            or 0
-        )
-    )
-    db.add(emissao)
+        combustivel_id=combustivel.combustivel_id
+    ).first()
 
-    # --- Cria consumo ---
-    consumo = Consumo(
+    if not emissao_existente:
+        emissao = Emissao(
+            veiculo_id=veiculo.veiculo_id,
+            combustivel_id=combustivel.combustivel_id,
+            nmhc=float(carro.get("emissao_de_nmhc_g/km") or 0),
+            co=float(carro.get("emissao_de_co_g/km") or 0),
+            nox=float(carro.get("emissao_de_nox_g/km") or 0),
+            co2=float(
+                carro.get("emissao_de_co2_gas_efeito_estufa_a_produzido_pela_combustao_do_etanol_g/km")
+                or carro.get("emissao_de_co2_gas_efeito_estufa_a_produzido_pela_combustao_da_gasolina_ou_diesel__g/km")
+                or 0
+            )
+        )
+        db.add(emissao)
+
+    # --- Cria consumo se ainda não existir ---
+    consumo_existente = db.query(Consumo).filter_by(
         veiculo_id=veiculo.veiculo_id,
-        combustivel_id=combustivel.combustivel_id,
-        rendimento_cidade=float(
-            carro.get("rendimento_da_gasolina_ou_diesel_na_cidade_km/l")
-            or carro.get("rendimento_do_etanol_na_cidade_km/l")
-            or 0
-        ),
-        rendimento_estrada=float(
-            carro.get("rendimento_da_gasolina_ou_diesel_estrada_km/l")
-            or carro.get("rendimento_do_etanol_na_estrada_km/l")
-            or 0
-        ),
-        consumo_energetico=float(carro.get("consumo_energetico_mj/km") or 0)
-    )
-    db.add(consumo)
+        combustivel_id=combustivel.combustivel_id
+    ).first()
+
+    if not consumo_existente:
+        consumo = Consumo(
+            veiculo_id=veiculo.veiculo_id,
+            combustivel_id=combustivel.combustivel_id,
+            rendimento_cidade=float(
+                carro.get("rendimento_da_gasolina_ou_diesel_na_cidade_km/l")
+                or carro.get("rendimento_do_etanol_na_cidade_km/l")
+                or 0
+            ),
+            rendimento_estrada=float(
+                carro.get("rendimento_da_gasolina_ou_diesel_estrada_km/l")
+                or carro.get("rendimento_do_etanol_na_estrada_km/l")
+                or 0
+            ),
+            consumo_energetico=float(carro.get("consumo_energetico_mj/km") or 0)
+        )
+        db.add(consumo)
+
     db.commit()
 
     # --- ADICIONA OU REMOVE FAVORITO ---
-    favorito_existente = db.query(Favorito).filter_by(usuario_id=usuario_id, veiculo_id=veiculo.veiculo_id).first()
+    favorito_existente = db.query(Favorito).filter_by(
+        usuario_id=usuario_id, veiculo_id=veiculo.veiculo_id
+    ).first()
+
     if favorito_existente:
         db.delete(favorito_existente)
         msg = "Veículo removido dos favoritos."
@@ -630,9 +651,16 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
         db.add(novo_fav)
         msg = "Veículo adicionado aos favoritos."
 
-    db.commit()
-    print("Colunas normalizadas:", df.columns.tolist())
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Erro de integridade: este favorito já existe.")
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar favorito: {str(e)}")
 
+    print("Colunas normalizadas:", df.columns.tolist())
 
     return {
         "mensagem": msg,
