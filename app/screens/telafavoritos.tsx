@@ -107,7 +107,11 @@ const TelaFavoritos = () => {
   // 🔹 Renderiza cada card de veículo
   const renderizarFavorito = ({ item }: { item: any }) => {
     const imagemUri =
-      item.imagem?.trim() || "https://cdn-icons-png.flaticon.com/512/744/744465.png";
+     item.imagem_url
+     ? `http://10.0.2.2:8000${item.imagem_url}`
+      : "https://cdn-icons-png.flaticon.com/512/744/744465.png";
+
+    console.log(item.imagem_url)
 
     return (
       <View style={estilos.cartaoCarro}>
@@ -141,6 +145,9 @@ const TelaFavoritos = () => {
               rendimento_cidade: item.rendimento_cidade ?? item.Rendimento_Cidade,
               rendimento_estrada: item.rendimento_estrada ?? item.Rendimento_Estrada,
               consumo_energetico: item.consumo_energetico ?? item.Consumo_Energetico,
+              imagem_url: item.imagem_url
+              ? `http://10.0.2.2:8000${item.imagem_url}`
+              : "https://cdn-icons-png.flaticon.com/512/744/744465.png",
             };
 
             const carroString = encodeURIComponent(JSON.stringify(carroPadronizado));

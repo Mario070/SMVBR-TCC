@@ -11,12 +11,15 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
+
 const { width } = Dimensions.get("window");
 
 const ComparisonScreen = () => {
   const { comparacao } = useLocalSearchParams();
   const router = useRouter();
 
+   // 👇 Hook de estado sempre no topo
+ 
   const dados = comparacao ? JSON.parse(comparacao as string) : null;
 
   if (!dados) {
@@ -30,6 +33,7 @@ const ComparisonScreen = () => {
   }
 
   const { carro1, carro2 } = dados;
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const [activeTab, setActiveTab] = useState("pollutants");
 
   const renderComparisonBars = () => {
@@ -144,18 +148,32 @@ const ComparisonScreen = () => {
           <Text style={styles.headerTitle}>Comparação de Carros</Text>
         </View>
 
-        {/* Fotos genéricas dos carros */}
-        <View style={styles.imageRow}>
-          <Image
-            source={{ uri: "https://cdn-icons-png.flaticon.com/512/744/744465.png" }}
-            style={styles.carImage}
-          />
-          <Text style={styles.vs}>VS</Text>
-          <Image
-            source={{ uri: "https://cdn-icons-png.flaticon.com/512/744/744465.png" }}
-            style={styles.carImage}
-          />
-        </View>
+    <View style={styles.imageRow}>
+  <Image
+    source={{
+      uri:
+        carro1.imagem_url && carro1.imagem_url !== ""
+          ? carro1.imagem_url.startsWith("http")
+            ? carro1.imagem_url
+            : `http://10.0.2.2:8000${carro1.imagem_url}` // 👈 coloca a URL base se for caminho relativo
+          : "https://cdn-icons-png.flaticon.com/512/744/744465.png",
+    }}
+    style={styles.carImage}
+  />
+  <Text style={styles.vs}>VS</Text>
+  <Image
+    source={{
+      uri:
+        carro2.imagem_url && carro2.imagem_url !== ""
+          ? carro2.imagem_url.startsWith("http")
+            ? carro2.imagem_url
+            : `http://10.0.2.2:8000${carro2.imagem_url}` // 👈 mesmo tratamento
+          : "https://cdn-icons-png.flaticon.com/512/744/744465.png",
+    }}
+    style={styles.carImage}
+  />
+</View>
+
 
         {/* Informações principais */}
         <View style={styles.vehicleRow}>

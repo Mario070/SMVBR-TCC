@@ -133,8 +133,6 @@ const toggleFavorito = async (item: any, fallbackIndex: number) => {
     Alert.alert("Erro", "Falha de conexão com o servidor");
   }
 };
-
-
   // filtro de texto
   const carrosFiltrados = useMemo(() => {
     const t = textoPesquisa.trim().toLowerCase();

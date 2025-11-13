@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import React from 'react';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -108,7 +109,14 @@ const DetalhesCarro = () => {
   rendGasEstrada: carro['rendimento da gasolina ou diesel estrada (km/l)'] ?? carro['rendimento_estrada'] ?? 'N/A',
   consumoEnergetico: carro['consumo energético (mj/km)'] ?? carro['consumo_energetico'] ?? 'N/A',
 
-  imagem: carro['imagem'] ?? 'https://cdn-icons-png.flaticon.com/512/744/744465.png',
+ 
+  imagem:
+  carro['imagem_url']
+    ? carro['imagem_url'].startsWith('http')
+      ? carro['imagem_url'] // vem da planilha (URL completa)
+      : `http://10.0.2.2:8000${carro['imagem_url']}` // vem do backend (caminho relativo)
+    : 'https://cdn-icons-png.flaticon.com/512/744/744465.png',
+
 };
 
 

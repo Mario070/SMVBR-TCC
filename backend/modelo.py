@@ -54,6 +54,8 @@ class Veiculo(Base):
     ar_condicionado = Column(Boolean)
     direcao_assistida = Column(Enum('H', 'E', 'H-E', 'M'), nullable=False)
     scoreFinal = Column(DECIMAL(10, 6), nullable=False)  # 👈 novo campo
+    imagem_url= Column(String(255),nullable=False)
+    
 
     # relacionamentos
     emissoes = relationship("Emissao", back_populates="veiculo")

@@ -536,6 +536,16 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
     if not carro:
         raise HTTPException(status_code=404, detail=f"Nenhum carro encontrado com código {codigo}")
     carro = carro[0]
+    
+    # Captura a coluna de imagem/foto, se existir
+    col_img = next((c for c in df.columns if "imagem" in c.lower() or "foto" in c.lower()), None)
+
+    # Pega o nome da imagem na linha do carro
+    imagem_nome = carro.get(col_img) if col_img else None
+
+    # Gera a URL que será salva no banco
+    imagem_url = f"/imgs/{imagem_nome}" if imagem_nome else None
+
 
     # --- Cria ou busca combustível ---
     combustivel_tipo = carro.get("combustivel", "N/A")
@@ -566,6 +576,9 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
     # --- Lê o scoreFinal (Pontuação Final da planilha) ---
     score_final = float(carro.get("pontuacao_final") or 0)
 
+
+
+    
     # --- Cria ou busca veículo ---
     veiculo = db.query(Veiculo).filter_by(codigo=carro["codigo"]).first()
     if not veiculo:
@@ -580,7 +593,8 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
             transmissao=carro.get("transmissao"),
             ar_condicionado=ar_condicionado,
             direcao_assistida=direcao_assistida,
-            scoreFinal=score_final  # 👈 adiciona a pontuação
+            scoreFinal=score_final, # 👈 adiciona a pontuação
+            imagem_url=imagem_url
         )
         db.add(veiculo)
         db.commit()
@@ -687,6 +701,7 @@ def get_veiculos_favoritos(usuario_id: int, db: Session = Depends(get_db)):
             "transmissao": veiculo.transmissao,
             "ar_condicionado": veiculo.ar_condicionado,
             "direcao_assistida": veiculo.direcao_assistida,
+            "imagem_url": veiculo.imagem_url, 
             "combustivel": (
                 emissao.combustivel.tipo
                 if emissao and emissao.combustivel
@@ -746,6 +761,7 @@ def comparar_carros(id1: int, id2: int, db: Session = Depends(get_db)):
             "rendimento_cidade": float(consumo1.rendimento_cidade or 0),
             "rendimento_estrada": float(consumo1.rendimento_estrada or 0),
             "consumo_energetico": float(consumo1.consumo_energetico or 0),
+            "imagem_url": veiculo1.imagem_url,
             "scoreFinal": float(veiculo1.scoreFinal or 0),
         },
         "carro2": {
@@ -761,7 +777,10 @@ def comparar_carros(id1: int, id2: int, db: Session = Depends(get_db)):
             "rendimento_cidade": float(consumo2.rendimento_cidade or 0),
             "rendimento_estrada": float(consumo2.rendimento_estrada or 0),
             "consumo_energetico": float(consumo2.consumo_energetico or 0),
+            "imagem_url": veiculo2.imagem_url,
             "scoreFinal": float(veiculo2.scoreFinal or 0),
         }
     }
    
+
+
