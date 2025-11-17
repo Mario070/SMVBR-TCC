@@ -133,8 +133,6 @@ const toggleFavorito = async (item: any, fallbackIndex: number) => {
     Alert.alert("Erro", "Falha de conexão com o servidor");
   }
 };
-
-
   // filtro de texto
   const carrosFiltrados = useMemo(() => {
     const t = textoPesquisa.trim().toLowerCase();
@@ -337,7 +335,7 @@ const toggleFavorito = async (item: any, fallbackIndex: number) => {
               {/* Motor */}
               <View style={estilos.secaoFiltro}>
                 <Text style={estilos.labelFiltro}>Motor</Text>
-                {['A', 'B', 'C', 'D', 'E'].map((motor) => (
+                {['1', '2', '3', '4', '5'].map((motor) => (
                   <View key={motor} style={estilos.checkboxLinha}>
                     <Checkbox
                       status={selectedMotor === motor ? 'checked' : 'unchecked'}
@@ -383,7 +381,7 @@ const toggleFavorito = async (item: any, fallbackIndex: number) => {
               {/* Direção assistida */}
               <View style={estilos.secaoFiltro}>
                 <Text style={estilos.labelFiltro}>Direção assistida</Text>
-                {['H', 'E', 'H-E', 'M'].map((dir) => (
+                {['H', 'E', 'HE', 'M'].map((dir) => (
                   <View key={dir} style={estilos.checkboxLinha}>
                     <Checkbox
                       status={selectedDirecao === dir ? 'checked' : 'unchecked'}
@@ -399,7 +397,7 @@ const toggleFavorito = async (item: any, fallbackIndex: number) => {
               {/* Combustível */}
               <View style={estilos.secaoFiltro}>
                 <Text style={estilos.labelFiltro}>Combustível</Text>
-                {['Gasolina', 'Etanol', 'Diesel', 'Flex'].map((comb) => (
+                {['G', 'E', 'D', 'F'].map((comb) => (
                   <View key={comb} style={estilos.checkboxLinha}>
                     <Checkbox
                       status={selectedCombustivel === comb ? 'checked' : 'unchecked'}

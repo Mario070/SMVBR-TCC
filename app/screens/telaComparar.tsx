@@ -13,9 +13,36 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
 
+// 🔹 Componente de imagem com fallback
+const ImagemVeiculo = ({ url }: { url: string }) => {
+  const [erro, setErro] = useState(false);
+
+  const imagemUri =
+    !erro &&
+    url &&
+    url.toLowerCase() !== "imgs/nan" &&
+    url.toLowerCase() !== "imagens/nan"
+      ? url.startsWith("http")
+        ? url
+        : `http://10.0.2.2:8000${url.startsWith("/") ? "" : "/"}${url}`
+      : "https://cdn-icons-png.flaticon.com/512/744/744465.png";
+
+  return (
+    <Image
+      source={{ uri: imagemUri }}
+      style={styles.carImage}
+      resizeMode="contain"
+      onError={() => setErro(true)}
+    />
+  );
+};
+
 const ComparisonScreen = () => {
   const { comparacao } = useLocalSearchParams();
-  const router = useRouter();
+ 
+
+  // 🔹 Hook sempre no topo
+  const [activeTab, setActiveTab] = useState("pollutants");
 
   const dados = comparacao ? JSON.parse(comparacao as string) : null;
 
@@ -30,7 +57,6 @@ const ComparisonScreen = () => {
   }
 
   const { carro1, carro2 } = dados;
-  const [activeTab, setActiveTab] = useState("pollutants");
 
   const renderComparisonBars = () => {
     switch (activeTab) {
@@ -42,94 +68,60 @@ const ComparisonScreen = () => {
           { nome: "NMHC", valor1: carro1.nmhc, valor2: carro2.nmhc },
         ];
 
-        return (
-          <>
-            {poluentes.map((p) => (
-              <View key={p.nome} style={styles.pollutantGroup}>
-                <Text style={styles.pollutantTitle}>{p.nome}</Text>
-                <View style={styles.barRow}>
-                  <Text style={styles.barLabel}>{carro1.marca}</Text>
-                  <View style={[styles.bar, styles.blueBar]}>
-                    <View
-                      style={[
-                        styles.fillBar,
-                        { width: `${Math.min(p.valor1 * 10, 100)}%` },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.barValue}>{p.valor1}</Text>
-                </View>
+        return poluentes.map((p) => (
+          <View key={p.nome} style={styles.pollutantGroup}>
+            <Text style={styles.pollutantTitle}>{p.nome}</Text>
 
-                <View style={styles.barRow}>
-                  <Text style={styles.barLabel}>{carro2.marca}</Text>
-                  <View style={[styles.bar, styles.greenBar]}>
+            {[{ valor: p.valor1, marca: carro1.marca, color: "blue" }, { valor: p.valor2, marca: carro2.marca, color: "green" }].map(
+              (item, idx) => (
+                <View key={idx} style={styles.barRow}>
+                  <Text style={styles.barLabel}>{item.marca}</Text>
+                  <View style={[styles.bar, item.color === "blue" ? styles.blueBar : styles.greenBar]}>
                     <View
                       style={[
                         styles.fillBar,
-                        { width: `${Math.min(p.valor2 * 10, 100)}%` },
+                        { width: `${Math.min(item.valor * 10, 100)}%` },
+                        { backgroundColor: item.color === "blue" ? "#2196F3" : "#4CAF50" },
                       ]}
                     />
                   </View>
-                  <Text style={styles.barValue}>{p.valor2}</Text>
+                  <Text style={styles.barValue}>{item.valor}</Text>
                 </View>
-              </View>
-            ))}
-          </>
-        );
+              )
+            )}
+          </View>
+        ));
 
       case "consumption":
         const consumo = [
-          {
-            nome: "Rendimento na Cidade (km/l)",
-            valor1: carro1.rendimento_cidade,
-            valor2: carro2.rendimento_cidade,
-          },
-          {
-            nome: "Rendimento na Estrada (km/l)",
-            valor1: carro1.rendimento_estrada,
-            valor2: carro2.rendimento_estrada,
-          },
-          {
-            nome: "Consumo Energético (MJ/km)",
-            valor1: carro1.consumo_energetico,
-            valor2: carro2.consumo_energetico,
-          },
+          { nome: "Rendimento na Cidade (km/l)", valor1: carro1.rendimento_cidade, valor2: carro2.rendimento_cidade },
+          { nome: "Rendimento na Estrada (km/l)", valor1: carro1.rendimento_estrada, valor2: carro2.rendimento_estrada },
+          { nome: "Consumo Energético (MJ/km)", valor1: carro1.consumo_energetico, valor2: carro2.consumo_energetico },
         ];
 
-        return (
-          <>
-            {consumo.map((c) => (
-              <View key={c.nome} style={styles.pollutantGroup}>
-                <Text style={styles.pollutantTitle}>{c.nome}</Text>
-                <View style={styles.barRow}>
-                  <Text style={styles.barLabel}>{carro1.marca}</Text>
-                  <View style={[styles.bar, styles.blueBar]}>
-                    <View
-                      style={[
-                        styles.fillBar,
-                        { width: `${Math.min(c.valor1 * 5, 100)}%` },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.barValue}>{c.valor1}</Text>
-                </View>
+        return consumo.map((c) => (
+          <View key={c.nome} style={styles.pollutantGroup}>
+            <Text style={styles.pollutantTitle}>{c.nome}</Text>
 
-                <View style={styles.barRow}>
-                  <Text style={styles.barLabel}>{carro2.marca}</Text>
-                  <View style={[styles.bar, styles.greenBar]}>
+            {[{ valor: c.valor1, marca: carro1.marca, color: "blue" }, { valor: c.valor2, marca: carro2.marca, color: "green" }].map(
+              (item, idx) => (
+                <View key={idx} style={styles.barRow}>
+                  <Text style={styles.barLabel}>{item.marca}</Text>
+                  <View style={[styles.bar, item.color === "blue" ? styles.blueBar : styles.greenBar]}>
                     <View
                       style={[
                         styles.fillBar,
-                        { width: `${Math.min(c.valor2 * 5, 100)}%` },
+                        { width: `${Math.min(item.valor * 5, 100)}%` },
+                        { backgroundColor: item.color === "blue" ? "#2196F3" : "#4CAF50" },
                       ]}
                     />
                   </View>
-                  <Text style={styles.barValue}>{c.valor2}</Text>
+                  <Text style={styles.barValue}>{item.valor}</Text>
                 </View>
-              </View>
-            ))}
-          </>
-        );
+              )
+            )}
+          </View>
+        ));
 
       default:
         return null;
@@ -139,41 +131,26 @@ const ComparisonScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Cabeçalho */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Comparação de Carros</Text>
         </View>
 
-        {/* Fotos genéricas dos carros */}
+        {/* Imagens dos carros com fallback */}
         <View style={styles.imageRow}>
-          <Image
-            source={{ uri: "https://cdn-icons-png.flaticon.com/512/744/744465.png" }}
-            style={styles.carImage}
-          />
+          <ImagemVeiculo url={carro1.imagem_url} />
           <Text style={styles.vs}>VS</Text>
-          <Image
-            source={{ uri: "https://cdn-icons-png.flaticon.com/512/744/744465.png" }}
-            style={styles.carImage}
-          />
+          <ImagemVeiculo url={carro2.imagem_url} />
         </View>
 
         {/* Informações principais */}
         <View style={styles.vehicleRow}>
           <View style={styles.vehicleInfo}>
-            <Text style={styles.vehicleName}>
-              {carro1.marca} {carro1.modelo}
-            </Text>
-            <Text style={styles.vehicleDetails}>
-              {carro1.ano} - {carro1.versao}
-            </Text>
+            <Text style={styles.vehicleName}>{carro1.marca} {carro1.modelo}</Text>
+            <Text style={styles.vehicleDetails}>{carro1.ano} - {carro1.versao}</Text>
           </View>
           <View style={styles.vehicleInfo}>
-            <Text style={styles.vehicleName}>
-              {carro2.marca} {carro2.modelo}
-            </Text>
-            <Text style={styles.vehicleDetails}>
-              {carro2.ano} - {carro2.versao}
-            </Text>
+            <Text style={styles.vehicleName}>{carro2.marca} {carro2.modelo}</Text>
+            <Text style={styles.vehicleDetails}>{carro2.ano} - {carro2.versao}</Text>
           </View>
         </View>
 
@@ -186,7 +163,6 @@ const ComparisonScreen = () => {
             </View>
             <Text style={styles.brandName}>{carro1.marca}</Text>
           </View>
-
           <View style={styles.sustainabilityItem}>
             <View style={[styles.circle, styles.greenCircle]}>
               <Text style={styles.circleText}>{carro2.scoreFinal}</Text>
@@ -198,34 +174,18 @@ const ComparisonScreen = () => {
         {/* Tabs */}
         <View style={styles.tabs}>
           <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === "pollutants" && styles.activeTab,
-            ]}
+            style={[styles.tab, activeTab === "pollutants" && styles.activeTab]}
             onPress={() => setActiveTab("pollutants")}
           >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === "pollutants" && styles.activeTabText,
-              ]}
-            >
+            <Text style={[styles.tabText, activeTab === "pollutants" && styles.activeTabText]}>
               Poluentes
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === "consumption" && styles.activeTab,
-            ]}
+            style={[styles.tab, activeTab === "consumption" && styles.activeTab]}
             onPress={() => setActiveTab("consumption")}
           >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === "consumption" && styles.activeTabText,
-              ]}
-            >
+            <Text style={[styles.tabText, activeTab === "consumption" && styles.activeTabText]}>
               Consumo
             </Text>
           </TouchableOpacity>
@@ -240,147 +200,38 @@ const ComparisonScreen = () => {
 
 export default ComparisonScreen;
 
+// 🔹 Estilos
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FFF",
-    paddingHorizontal: 16,
-  },
-  header: {
-    alignItems: "center",
-    marginTop: 10,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  imageRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    marginTop: 20,
-  },
-  carImage: {
-    width: 120,
-    height: 120,
-    resizeMode: "contain",
-  },
-  vs: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  vehicleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginVertical: 15,
-  },
-  vehicleInfo: {
-    width: width * 0.42,
-    alignItems: "center",
-  },
-  vehicleName: {
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  vehicleDetails: {
-    fontSize: 14,
-    color: "#555",
-  },
-  sectionTitle: {
-    fontWeight: "bold",
-    fontSize: 16,
-    marginTop: 10,
-    textAlign: "center",
-  },
-  sustainabilityContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginVertical: 15,
-  },
-  sustainabilityItem: {
-    alignItems: "center",
-  },
-  circle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  blueCircle: {
-    backgroundColor: "#cce5ff",
-  },
-  greenCircle: {
-    backgroundColor: "#ccffcc",
-  },
-  circleText: {
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  brandName: {
-    fontSize: 14,
-    color: "#333",
-  },
-  tabs: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginBottom: 10,
-  },
-  tab: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderBottomWidth: 2,
-    borderColor: "transparent",
-  },
-  activeTab: {
-    borderColor: "#2196F3",
-  },
-  tabText: {
-    color: "#777",
-    fontWeight: "600",
-  },
-  activeTabText: {
-    color: "#2196F3",
-  },
-  pollutantGroup: {
-    marginVertical: 10,
-  },
-  pollutantTitle: {
-    fontWeight: "bold",
-    marginBottom: 6,
-    fontSize: 16,
-  },
-  barRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 5,
-  },
-  barLabel: {
-    width: 60,
-  },
-  bar: {
-    flex: 1,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#eee",
-    marginHorizontal: 10,
-    overflow: "hidden",
-  },
-  fillBar: {
-    height: "100%",
-    borderRadius: 5,
-    backgroundColor: "#2196F3",
-  },
-  blueBar: {
-    backgroundColor: "#d0e6ff",
-  },
-  greenBar: {
-    backgroundColor: "#d6f5d6",
-  },
-  barValue: {
-    width: 50,
-    textAlign: "right",
-  },
+  container: { flex: 1, backgroundColor: "#FFF", paddingHorizontal: 16 },
+  header: { alignItems: "center", marginTop: 10 },
+  headerTitle: { fontSize: 18, fontWeight: "bold" },
+  imageRow: { flexDirection: "row", justifyContent: "space-around", alignItems: "center", marginTop: 20 },
+  carImage: { width: 120, height: 120, resizeMode: "contain" },
+  vs: { fontSize: 20, fontWeight: "bold", color: "#333" },
+  vehicleRow: { flexDirection: "row", justifyContent: "space-between", marginVertical: 15 },
+  vehicleInfo: { width: width * 0.42, alignItems: "center" },
+  vehicleName: { fontSize: 16, fontWeight: "bold" },
+  vehicleDetails: { fontSize: 14, color: "#555" },
+  sectionTitle: { fontWeight: "bold", fontSize: 16, marginTop: 10, textAlign: "center" },
+  sustainabilityContainer: { flexDirection: "row", justifyContent: "space-around", marginVertical: 15 },
+  sustainabilityItem: { alignItems: "center" },
+  circle: { width: 80, height: 80, borderRadius: 40, justifyContent: "center", alignItems: "center", marginBottom: 6 },
+  blueCircle: { backgroundColor: "#cce5ff" },
+  greenCircle: { backgroundColor: "#ccffcc" },
+  circleText: { fontSize: 20, fontWeight: "bold" },
+  brandName: { fontSize: 14, color: "#333" },
+  tabs: { flexDirection: "row", justifyContent: "center", marginBottom: 10 },
+  tab: { paddingVertical: 8, paddingHorizontal: 16, borderBottomWidth: 2, borderColor: "transparent" },
+  activeTab: { borderColor: "#2196F3" },
+  tabText: { color: "#777", fontWeight: "600" },
+  activeTabText: { color: "#2196F3" },
+  pollutantGroup: { marginVertical: 10 },
+  pollutantTitle: { fontWeight: "bold", marginBottom: 6, fontSize: 16 },
+  barRow: { flexDirection: "row", alignItems: "center", marginBottom: 5 },
+  barLabel: { width: 60 },
+  bar: { flex: 1, height: 10, borderRadius: 5, backgroundColor: "#eee", marginHorizontal: 10, overflow: "hidden" },
+  fillBar: { height: "100%", borderRadius: 5 },
+  blueBar: { backgroundColor: "#d0e6ff" },
+  greenBar: { backgroundColor: "#d6f5d6" },
+  barValue: { width: 50, textAlign: "right" },
 });
