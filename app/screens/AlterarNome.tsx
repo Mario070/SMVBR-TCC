@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import { API_BASE_URL } from "../config";
 
 export default function AlterarNome() {
   const [nome, setNome] = useState<string>("");
@@ -41,7 +42,7 @@ export default function AlterarNome() {
         return;
       }
 
-      const response = await fetch("http://10.0.2.2:8000/usuario/nome", {
+      const response = await fetch(`${API_BASE_URL}/usuario/nome`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

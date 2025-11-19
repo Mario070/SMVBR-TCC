@@ -1,28 +1,25 @@
 // app/screens/Cadastro.tsx
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from "react-native";
+import { View, StyleSheet, Alert } from "react-native";
 import { router } from "expo-router";
+import { API_BASE_URL } from "../config";
+import { theme } from "../theme";
+import { Button, Text, TextInput } from "react-native-paper";
 
 export default function Cadastro() {
   const [nome, setNome] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [senha, setSenha] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
 
   const handleCadastro = async () => {
     if (!nome || !email || !senha) {
       Alert.alert("Erro", "Preencha todos os campos!");
       return;
     }
-
+    setLoading(true);
     try {
-      const response = await fetch("http://10.0.2.2:8000/cadastro", {
+      const response = await fetch(`${API_BASE_URL}/cadastro`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nome, email, senha }),
@@ -38,53 +35,77 @@ export default function Cadastro() {
     } catch (error) {
       Alert.alert("Erro", "Não foi possível conectar ao servidor.");
       console.error(error);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Cadastro</Text>
+      <Text variant="headlineLarge" style={styles.title}>
+        Cadastro
+      </Text>
 
       <TextInput
-        style={styles.input}
-        placeholder="Nome completo"
+        label="Nome completo"
         value={nome}
         onChangeText={setNome}
+        style={styles.input}
       />
 
       <TextInput
-        style={styles.input}
-        placeholder="E-mail"
+        label="E-mail"
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
         autoCapitalize="none"
+        style={styles.input}
       />
 
       <TextInput
-        style={styles.input}
-        placeholder="Senha"
+        label="Senha"
         value={senha}
         onChangeText={setSenha}
         secureTextEntry
+        style={styles.input}
       />
 
-      <TouchableOpacity style={styles.button} onPress={handleCadastro}>
-        <Text style={styles.buttonText}>Cadastrar</Text>
-      </TouchableOpacity>
+      <Button
+        mode="contained"
+        onPress={handleCadastro}
+        loading={loading}
+        disabled={loading}
+        style={styles.button}
+        buttonColor={theme.colors.secondary} // Usando a cor secundária do tema
+      >
+        Cadastrar
+      </Button>
 
-      <TouchableOpacity onPress={() => router.push("/screens/Login")}>
-        <Text style={styles.link}>Já tem conta? Faça login</Text>
-      </TouchableOpacity>
+      <Button onPress={() => router.push("/screens/Login")} style={styles.linkButton}>
+        Já tem conta? Faça login
+      </Button>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", padding: 20, backgroundColor: "#f5f5f5" },
-  title: { fontSize: 28, fontWeight: "bold", textAlign: "center", marginBottom: 30, color: "#333" },
-  input: { height: 50, backgroundColor: "#fff", borderRadius: 8, paddingHorizontal: 15, marginBottom: 15, fontSize: 16, borderWidth: 1, borderColor: "#ddd" },
-  button: { backgroundColor: "#28a745", padding: 15, borderRadius: 8, alignItems: "center", marginBottom: 15 },
-  buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
-  link: { textAlign: "center", color: "#007BFF", fontSize: 16 },
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 20,
+  },
+  title: {
+    textAlign: "center",
+    marginBottom: 30,
+  },
+  input: {
+    marginBottom: 15,
+  },
+  button: {
+    marginTop: 10,
+    padding: 5,
+  },
+  linkButton: {
+    marginTop: 10,
+  },
 });

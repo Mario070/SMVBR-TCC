@@ -10,6 +10,7 @@ import {
   Image,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { API_BASE_URL } from "../config";
 
 const { width } = Dimensions.get("window");
 
@@ -24,7 +25,7 @@ const ImagemVeiculo = ({ url }: { url: string }) => {
     url.toLowerCase() !== "imagens/nan"
       ? url.startsWith("http")
         ? url
-        : `http://10.0.2.2:8000${url.startsWith("/") ? "" : "/"}${url}`
+        : `${API_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`
       : "https://cdn-icons-png.flaticon.com/512/744/744465.png";
 
   return (

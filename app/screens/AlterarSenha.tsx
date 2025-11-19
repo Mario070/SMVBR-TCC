@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import { API_BASE_URL } from "../config";
 
 export default function AlterarSenha() {
   const [senhaAtual, setSenhaAtual] = useState<string>("");
@@ -45,7 +46,7 @@ export default function AlterarSenha() {
         return;
       }
 
-      const response = await fetch("http://10.0.2.2:8000/usuario/senha", {
+      const response = await fetch(`${API_BASE_URL}/usuario/senha`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
