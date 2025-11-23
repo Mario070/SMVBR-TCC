@@ -200,173 +200,200 @@ const TelaInicial = () => {
   };
 
   const fecharModal = () => setFiltroVisivel(false);
-const limparFiltros = () => {
-  setSelectedAno(null);
-  setSelectedGrupo(null);
-  setSelectedMarca('');
-  setSelectedMotor(null);
-  setSelectedTransmissao(null);
-  setSelectedAr(null);
-  setSelectedDirecao(null);
-  setSelectedCombustivel(null);
-  buscarCarros(); // recarrega lista padrão
-  Alert.alert('Filtros limpos', 'Todos os filtros foram removidos.');
-  setFiltroVisivel(false);
-};
+  const limparFiltros = () => {
+    setSelectedAno(null);
+    setSelectedGrupo(null);
+    setSelectedMarca('');
+    setSelectedMotor(null);
+    setSelectedTransmissao(null);
+    setSelectedAr(null);
+    setSelectedDirecao(null);
+    setSelectedCombustivel(null);
+    buscarCarros(); // recarrega lista padrão
+    Alert.alert('Filtros limpos', 'Todos os filtros foram removidos.');
+    setFiltroVisivel(false);
+  };
 
-const renderizarFiltroModal = () => (
-  <Modal visible={filtroVisivel} animationType="slide" transparent>
-    <View style={estilos.sobreposicaoModal}>
-      <View style={estilos.conteudoModal}>
-        <TouchableOpacity style={estilos.botaoFechar} onPress={fecharModal}>
-          <Ionicons name="close" size={24} color="#000" />
-        </TouchableOpacity>
+  const renderizarFiltroModal = () => (
+    <Modal visible={filtroVisivel} animationType="slide" transparent>
+      <View style={estilos.sobreposicaoModal}>
+        <View style={estilos.conteudoModal}>
+          <TouchableOpacity style={estilos.botaoFechar} onPress={fecharModal}>
+            <Ionicons name="close" size={24} color="#000" />
+          </TouchableOpacity>
 
-        <Text style={estilos.tituloModal}>Filtros</Text>
+          <Text style={estilos.tituloModal}>Filtros</Text>
 
-        <ScrollView style={estilos.scrollFiltros}>
-          
-          {/* Ano */}
-          <View style={estilos.secaoFiltro}>
-            <Text style={estilos.labelFiltro}>Ano</Text>
-            <View style={estilos.pickerContainer}>
-              <Picker selectedValue={selectedAno} onValueChange={setSelectedAno}>
-                <Picker.Item label="Todos os anos" value={null} />
-                {Array.from({ length: 2025 - 2013 + 1 }, (_, i) => 2013 + i).map((ano) => (
-                  <Picker.Item key={ano} label={String(ano)} value={ano} />
-                ))}
-              </Picker>
+          <ScrollView style={estilos.scrollFiltros}>
+
+            {/* Ano */}
+            <View style={estilos.secaoFiltro}>
+              <Text style={estilos.labelFiltro}>Ano</Text>
+              <View style={estilos.pickerContainer}>
+                <Picker selectedValue={selectedAno} onValueChange={setSelectedAno}>
+                  <Picker.Item label="Todos os anos" value={null} />
+                  {Array.from({ length: 2025 - 2013 + 1 }, (_, i) => 2013 + i).map((ano) => (
+                    <Picker.Item key={ano} label={String(ano)} value={ano} />
+                  ))}
+                </Picker>
+              </View>
             </View>
+
+            {/* Grupo */}
+            <View style={estilos.secaoFiltro}>
+              <Text style={estilos.labelFiltro}>Grupo</Text>
+              {['Pequeno', 'Médio – Grande', 'Utilitário', 'Trabalho', 'Luxo'].map((grupo) => (
+                <View key={grupo} style={estilos.checkboxLinha}>
+                  <Checkbox
+                    status={selectedGrupo === grupo ? 'checked' : 'unchecked'}
+                    onPress={() =>
+                      setSelectedGrupo(selectedGrupo === grupo ? null : grupo)
+                    }
+                  />
+                  <Text style={estilos.textoCheckbox}>{grupo}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Marca */}
+            <View style={estilos.secaoFiltro}>
+              <Text style={estilos.labelFiltro}>Marca</Text>
+              <TextInput
+                style={estilos.inputPesquisa}
+                placeholder="Digite a marca"
+                placeholderTextColor="#888"
+                value={selectedMarca}
+                onChangeText={setSelectedMarca}
+              />
+            </View>
+
+            {/* Motor */}
+            <View style={estilos.secaoFiltro}>
+              <Text style={estilos.labelFiltro}>Motor</Text>
+
+              {[
+                { label: 'Até 1,5 cilindradas', value: '1' },
+                { label: 'De 1,6 até 2,0 cilindradas', value: '2' },
+                { label: 'Acima de 2,0 até 2,9 cilindradas', value: '3' },
+                { label: 'Acima de 3 cilindradas', value: '4' },
+                { label: 'Elétrico', value: '5' },
+              ].map((motor) => (
+                <View key={motor.value} style={estilos.checkboxLinha}>
+                  <Checkbox
+                    status={selectedMotor === motor.value ? 'checked' : 'unchecked'}
+                    onPress={() =>
+                      setSelectedMotor(selectedMotor === motor.value ? null : motor.value)
+                    }
+                  />
+                  <Text style={estilos.textoCheckbox}>{motor.label}</Text>
+                </View>
+              ))}
+            </View>
+
+
+            {/* Transmissão */}
+            <View style={estilos.secaoFiltro}>
+              <Text style={estilos.labelFiltro}>Transmissão</Text>
+              {['Automática', 'Semiautomática', 'Manual'].map((trans) => (
+                <View key={trans} style={estilos.checkboxLinha}>
+                  <Checkbox
+                    status={selectedTransmissao === trans ? 'checked' : 'unchecked'}
+                    onPress={() =>
+                      setSelectedTransmissao(selectedTransmissao === trans ? null : trans)
+                    }
+                  />
+                  <Text style={estilos.textoCheckbox}>{trans}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Ar-condicionado */}
+            <View style={estilos.secaoFiltro}>
+              <Text style={estilos.labelFiltro}>Ar-condicionado</Text>
+
+              {[
+                { label: 'Sim', value: 'S' },
+                { label: 'Não', value: 'N' },
+              ].map((ar) => (
+                <View key={ar.value} style={estilos.checkboxLinha}>
+                  <Checkbox
+                    status={selectedAr === ar.value ? 'checked' : 'unchecked'}
+                    onPress={() =>
+                      setSelectedAr(selectedAr === ar.value ? null : ar.value)
+                    }
+                  />
+                  <Text style={estilos.textoCheckbox}>{ar.label}</Text>
+                </View>
+              ))}
+            </View>
+
+
+            {/* Direção assistida */}
+            <View style={estilos.secaoFiltro}>
+              <Text style={estilos.labelFiltro}>Direção assistida</Text>
+
+              {[
+                { label: 'Hidráulica', value: 'H' },
+                { label: 'Elétrica', value: 'E' },
+                { label: 'Eletro-hidráulica', value: 'HE' },
+                { label: 'Manual', value: 'M' },
+              ].map((dir) => (
+                <View key={dir.value} style={estilos.checkboxLinha}>
+                  <Checkbox
+                    status={selectedDirecao === dir.value ? 'checked' : 'unchecked'}
+                    onPress={() =>
+                      setSelectedDirecao(selectedDirecao === dir.value ? null : dir.value)
+                    }
+                  />
+                  <Text style={estilos.textoCheckbox}>{dir.label}</Text>
+                </View>
+              ))}
+            </View>
+
+
+            <View style={estilos.secaoFiltro}>
+              <Text style={estilos.labelFiltro}>Combustível</Text>
+
+              {[
+                { label: 'Gasolina', value: 'G' },
+                { label: 'Etanol', value: 'E' },
+                { label: 'Diesel', value: 'D' },
+                { label: 'Flex', value: 'F' }
+              ].map((comb) => (
+                <View key={comb.value} style={estilos.checkboxLinha}>
+                  <Checkbox
+                    status={selectedCombustivel === comb.value ? 'checked' : 'unchecked'}
+                    onPress={() =>
+                      setSelectedCombustivel(selectedCombustivel === comb.value ? null : comb.value)
+                    }
+                  />
+                  <Text style={estilos.textoCheckbox}>{comb.label}</Text>
+                </View>
+              ))}
+            </View>
+
+          </ScrollView>
+
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity
+              style={[estilos.botaoAplicar, { flex: 1, backgroundColor: '#eee' }]}
+              onPress={limparFiltros}
+            >
+              <Text style={[estilos.textoBotao, { color: '#000' }]}>Limpar</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[estilos.botaoAplicar, { flex: 1 }]}
+              onPress={buscarCarrosFiltrados}
+            >
+              <Text style={estilos.textoBotao}>Aplicar</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Grupo */}
-          <View style={estilos.secaoFiltro}>
-            <Text style={estilos.labelFiltro}>Grupo</Text>
-            {['Pequeno', 'Médio – Grande', 'Utilitário', 'Trabalho', 'Luxo'].map((grupo) => (
-              <View key={grupo} style={estilos.checkboxLinha}>
-                <Checkbox
-                  status={selectedGrupo === grupo ? 'checked' : 'unchecked'}
-                  onPress={() =>
-                    setSelectedGrupo(selectedGrupo === grupo ? null : grupo)
-                  }
-                />
-                <Text style={estilos.textoCheckbox}>{grupo}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Marca */}
-          <View style={estilos.secaoFiltro}>
-            <Text style={estilos.labelFiltro}>Marca</Text>
-            <TextInput
-              style={estilos.inputPesquisa}
-              placeholder="Digite a marca"
-              placeholderTextColor="#888"
-              value={selectedMarca}
-              onChangeText={setSelectedMarca}
-            />
-          </View>
-
-          {/* Motor */}
-          <View style={estilos.secaoFiltro}>
-            <Text style={estilos.labelFiltro}>Motor</Text>
-            {['1', '2', '3', '4', '5'].map((motor) => (
-              <View key={motor} style={estilos.checkboxLinha}>
-                <Checkbox
-                  status={selectedMotor === motor ? 'checked' : 'unchecked'}
-                  onPress={() =>
-                    setSelectedMotor(selectedMotor === motor ? null : motor)
-                  }
-                />
-                <Text style={estilos.textoCheckbox}>{motor}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Transmissão */}
-          <View style={estilos.secaoFiltro}>
-            <Text style={estilos.labelFiltro}>Transmissão</Text>
-            {['Automática', 'Semiautomática', 'Manual'].map((trans) => (
-              <View key={trans} style={estilos.checkboxLinha}>
-                <Checkbox
-                  status={selectedTransmissao === trans ? 'checked' : 'unchecked'}
-                  onPress={() =>
-                    setSelectedTransmissao(selectedTransmissao === trans ? null : trans)
-                  }
-                />
-                <Text style={estilos.textoCheckbox}>{trans}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Ar-condicionado */}
-          <View style={estilos.secaoFiltro}>
-            <Text style={estilos.labelFiltro}>Ar-condicionado</Text>
-            {['S', 'N'].map((ar) => (
-              <View key={ar} style={estilos.checkboxLinha}>
-                <Checkbox
-                  status={selectedAr === ar ? 'checked' : 'unchecked'}
-                  onPress={() => setSelectedAr(selectedAr === ar ? null : ar)}
-                />
-                <Text style={estilos.textoCheckbox}>{ar}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Direção assistida */}
-          <View style={estilos.secaoFiltro}>
-            <Text style={estilos.labelFiltro}>Direção assistida</Text>
-            {['H', 'E', 'HE', 'M'].map((dir) => (
-              <View key={dir} style={estilos.checkboxLinha}>
-                <Checkbox
-                  status={selectedDirecao === dir ? 'checked' : 'unchecked'}
-                  onPress={() =>
-                    setSelectedDirecao(selectedDirecao === dir ? null : dir)
-                  }
-                />
-                <Text style={estilos.textoCheckbox}>{dir}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Combustível */}
-          <View style={estilos.secaoFiltro}>
-            <Text style={estilos.labelFiltro}>Combustível</Text>
-            {['G', 'E', 'D', 'F'].map((comb) => (
-              <View key={comb} style={estilos.checkboxLinha}>
-                <Checkbox
-                  status={selectedCombustivel === comb ? 'checked' : 'unchecked'}
-                  onPress={() =>
-                    setSelectedCombustivel(selectedCombustivel === comb ? null : comb)
-                  }
-                />
-                <Text style={estilos.textoCheckbox}>{comb}</Text>
-              </View>
-            ))}
-          </View>
-
-        </ScrollView>
-
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity
-            style={[estilos.botaoAplicar, { flex: 1, backgroundColor: '#eee' }]}
-            onPress={limparFiltros}
-          >
-            <Text style={[estilos.textoBotao, { color: '#000' }]}>Limpar</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[estilos.botaoAplicar, { flex: 1 }]}
-            onPress={buscarCarrosFiltrados}
-          >
-            <Text style={estilos.textoBotao}>Aplicar</Text>
-          </TouchableOpacity>
         </View>
-
       </View>
-    </View>
-  </Modal>
-);
+    </Modal>
+  );
 
 
   return (

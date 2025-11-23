@@ -53,7 +53,7 @@ class Veiculo(Base):
     transmissao = Column(String(100))
     ar_condicionado = Column(Boolean)
     direcao_assistida = Column(Enum('H', 'E', 'H-E', 'M'), nullable=False)
-    scoreFinal = Column(DECIMAL(10, 6), nullable=False)  # 👈 novo campo
+    scoreFinal = Column(DECIMAL(10, 6), nullable=False)  
     imagem_url= Column(String(255),nullable=False)
     
 
@@ -61,6 +61,8 @@ class Veiculo(Base):
     emissoes = relationship("Emissao", back_populates="veiculo")
     consumos = relationship("Consumo", back_populates="veiculo")
     favoritos = relationship("Favorito", back_populates="veiculo")
+    quartil = relationship("QuartilVeiculo", back_populates="veiculo", uselist=False)
+
 
 
 # -------------------------------------------------------
@@ -135,3 +137,22 @@ class Favorito(Base):
     # relacionamentos
     usuario = relationship("Usuario", back_populates="favoritos")
     veiculo = relationship("Veiculo", back_populates="favoritos")
+
+# -------------------------------------------------------
+# TABELA: quartis
+# -------------------------------------------------------
+class QuartilVeiculo(Base):
+    __tablename__ = "quartis_veiculo"
+
+    quartil_id = Column(Integer, primary_key=True, autoincrement=True)
+    veiculo_id = Column(Integer, ForeignKey("veiculos.veiculo_id"), nullable=False, unique=True)
+
+    quartil_nmhc = Column(String(20))
+    quartil_co = Column(String(20))
+    quartil_nox = Column(String(20))
+    quartil_co2 = Column(String(20))
+    quartil_consumo_energetico = Column(String(20))
+    quartil_score = Column(String(5))  # A, B, C, D
+
+    # Relacionamento com Veiculo
+    veiculo = relationship("Veiculo", back_populates="quartil")

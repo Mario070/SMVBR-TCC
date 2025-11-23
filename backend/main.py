@@ -28,6 +28,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 import os
 import pandas as pd
+from backend.modelo import QuartilVeiculo
+
 
 
 # cria tabelas (se ainda não criadas)
@@ -515,7 +517,7 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
     # Lê a planilha
     df = pd.read_excel(caminho)
 
-    # Normaliza colunas: remove espaços, acentos, coloca lower
+    # Normaliza colunas
     df.columns = [
         c.strip().lower()
         .replace(" ", "_")
@@ -531,38 +533,28 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
         .replace("ó", "o")
         .replace("ô", "o")
         .replace("ú", "u")
-    for c in df.columns
+        for c in df.columns
     ]
 
-    # Normaliza coluna de código
     if "codigo" not in df.columns:
         raise HTTPException(status_code=500, detail="Coluna 'codigo' ausente na planilha")
 
     df["codigo"] = df["codigo"].astype(str).str.strip()
     codigo = str(codigo).strip()
 
-    # Busca o carro pelo código
     carro = df[df["codigo"] == codigo.upper()].to_dict(orient="records")
     if not carro:
         raise HTTPException(status_code=404, detail=f"Nenhum carro encontrado com código {codigo}")
     carro = carro[0]
-    
-    # Captura a coluna de imagem/foto, se existir
+
+    # --- IMAGEM ---
     col_img = next((c for c in df.columns if "imagem" in c.lower() or "foto" in c.lower()), None)
-
-    # Pega o nome da imagem na linha do carro
     imagem_nome = carro.get(col_img) if col_img else None
-
-    # Gera a URL que será salva no banco
     imagem_url = f"/imgs/{imagem_nome}" if imagem_nome else None
 
-
-    # --- Cria ou busca combustível ---
+    # --- Combustível ---
     combustivel_tipo = carro.get("combustivel", "N/A")
-    if combustivel_tipo:
-        combustivel_tipo = combustivel_tipo.strip().upper()
-    else:
-        combustivel_tipo = "N/A"
+    combustivel_tipo = combustivel_tipo.strip().upper() if combustivel_tipo else "N/A"
 
     combustivel = db.query(Combustivel).filter(Combustivel.tipo == combustivel_tipo).first()
     if not combustivel:
@@ -571,25 +563,22 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
         db.commit()
         db.refresh(combustivel)
 
-    # --- Converte ar_condicionado ---
+    # --- AR CONDICIONADO ---
     ar_condicionado = carro.get("ar_condicionado", "N")
     if isinstance(ar_condicionado, str):
         ar_condicionado = ar_condicionado.strip().lower() in ["sim", "s", "true", "1"]
     else:
         ar_condicionado = bool(ar_condicionado)
 
-    # --- Converte direcao_assistida ---
+    # --- DIREÇÃO ---
     direcao_assistida = carro.get("direcao_assistida", "M")
     if direcao_assistida not in ["H", "E", "H-E", "M"]:
         direcao_assistida = "M"
 
-    # --- Lê o scoreFinal (Pontuação Final da planilha) ---
+    # --- Score final da planilha ---
     score_final = float(carro.get("pontuacao_final") or 0)
 
-
-
-    
-    # --- Cria ou busca veículo ---
+    # --- CRIA OU BUSCA O VEÍCULO ---
     veiculo = db.query(Veiculo).filter_by(codigo=carro["codigo"]).first()
     if not veiculo:
         veiculo = Veiculo(
@@ -603,17 +592,16 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
             transmissao=carro.get("transmissao"),
             ar_condicionado=ar_condicionado,
             direcao_assistida=direcao_assistida,
-            scoreFinal=score_final, # 👈 adiciona a pontuação
+            scoreFinal=score_final,
             imagem_url=imagem_url
         )
         db.add(veiculo)
         db.commit()
         db.refresh(veiculo)
 
-    # --- Cria emissões se ainda não existir ---
+    # --- EMISSÕES ---
     emissao_existente = db.query(Emissao).filter_by(
-        veiculo_id=veiculo.veiculo_id,
-        combustivel_id=combustivel.combustivel_id
+        veiculo_id=veiculo.veiculo_id, combustivel_id=combustivel.combustivel_id
     ).first()
 
     if not emissao_existente:
@@ -623,18 +611,13 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
             nmhc=float(carro.get("emissao_de_nmhc_g/km") or 0),
             co=float(carro.get("emissao_de_co_g/km") or 0),
             nox=float(carro.get("emissao_de_nox_g/km") or 0),
-            co2=float(
-                carro.get("emissao_de_co2_gas_efeito_estufa_a_produzido_pela_combustao_do_etanol_g/km")
-                or carro.get("emissao_de_co2_gas_efeito_estufa_a_produzido_pela_combustao_da_gasolina_ou_diesel__g/km")
-                or 0
-            )
+            co2=float(carro.get("emissao_de_co2_g/km") or 0),
         )
         db.add(emissao)
 
-    # --- Cria consumo se ainda não existir ---
+    # --- CONSUMO ---
     consumo_existente = db.query(Consumo).filter_by(
-        veiculo_id=veiculo.veiculo_id,
-        combustivel_id=combustivel.combustivel_id
+        veiculo_id=veiculo.veiculo_id, combustivel_id=combustivel.combustivel_id
     ).first()
 
     if not consumo_existente:
@@ -655,9 +638,46 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
         )
         db.add(consumo)
 
+    # ==========================================================
+    # 🔥 NOVO TRECHO ---> CRIA/ATUALIZA QUARTIS DO VEÍCULO
+    # ==========================================================
+
+    quartil_nmhc = carro.get("quartil_do_nmhc")
+    quartil_co = carro.get("quartil_do_co")
+    quartil_nox = carro.get("quartil_do_nox")
+    quartil_co2 = carro.get("quartil_do_co2")
+    quartil_consumo_energetico = carro.get("quartil_do_consumo_energetico")
+    quartil_score = carro.get("quartil_do_score")
+
+
+    quartil_existente = db.query(QuartilVeiculo).filter_by(
+        veiculo_id=veiculo.veiculo_id
+    ).first()
+
+    if not quartil_existente:
+        quartil = QuartilVeiculo(
+            veiculo_id=veiculo.veiculo_id,
+            quartil_nmhc=quartil_nmhc,
+            quartil_co=quartil_co,
+            quartil_nox=quartil_nox,
+            quartil_co2=quartil_co2,
+            quartil_consumo_energetico=quartil_consumo_energetico,
+            quartil_score=quartil_score
+        )
+        db.add(quartil)
+    else:
+        quartil_existente.quartil_nmhc = quartil_nmhc
+        quartil_existente.quartil_co = quartil_co
+        quartil_existente.quartil_nox = quartil_nox
+        quartil_existente.quartil_co2 = quartil_co2
+        quartil_existente.quartil_consumo_energetico = quartil_consumo_energetico
+        quartil_existente.quartil_score = quartil_score
+
+    # ==========================================================
+
     db.commit()
 
-    # --- ADICIONA OU REMOVE FAVORITO ---
+    # --- FAVORITAR / DESFAVORITAR ---
     favorito_existente = db.query(Favorito).filter_by(
         usuario_id=usuario_id, veiculo_id=veiculo.veiculo_id
     ).first()
@@ -679,12 +699,18 @@ def favoritar_veiculo(usuario_id: int, codigo: str = Body(..., embed=True), db: 
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Erro ao salvar favorito: {str(e)}")
 
-    print("Colunas normalizadas:", df.columns.tolist())
-
     return {
         "mensagem": msg,
         "veiculo_id": veiculo.veiculo_id,
-        "scoreFinal": score_final
+        "scoreFinal": score_final,
+        "quartis": {
+            "nmhc": quartil_nmhc,
+            "co": quartil_co,
+            "nox": quartil_nox,
+            "co2": quartil_co2,
+            "consumo_energetico": quartil_consumo_energetico,
+            "score": quartil_score,
+        }
     }
 
 
@@ -694,34 +720,34 @@ from sqlalchemy.orm import joinedload
 
 @app.get("/veiculos_favoritos/{usuario_id}")
 def get_veiculos_favoritos(usuario_id: int, db: Session = Depends(get_db)):
-    # Busca todos os veículos favoritos do usuário com JOINs automáticos
     favoritos = (
         db.query(models.Favorito)
         .options(
             joinedload(models.Favorito.veiculo)
             .joinedload(models.Veiculo.emissoes)
             .joinedload(models.Emissao.combustivel),
+
             joinedload(models.Favorito.veiculo)
             .joinedload(models.Veiculo.consumos)
             .joinedload(models.Consumo.combustivel),
+
+            # 🔥 Novo: JOIN correto para quartil
+            joinedload(models.Favorito.veiculo)
+            .joinedload(models.Veiculo.quartil)
         )
         .filter(models.Favorito.usuario_id == usuario_id)
         .all()
     )
 
-    if not favoritos:
-        raise HTTPException(status_code=404, detail="Nenhum veículo favorito encontrado.")
-
     resultado = []
 
     for fav in favoritos:
         veiculo = fav.veiculo
-        if not veiculo:
-            continue
-
-        # Pega o primeiro combustível encontrado (caso haja mais de um)
         emissao = veiculo.emissoes[0] if veiculo.emissoes else None
         consumo = veiculo.consumos[0] if veiculo.consumos else None
+
+        # ✔ pegando um objeto, não lista
+        quartil = veiculo.quartil  
 
         resultado.append({
             "veiculo_id": veiculo.veiculo_id,
@@ -734,28 +760,32 @@ def get_veiculos_favoritos(usuario_id: int, db: Session = Depends(get_db)):
             "transmissao": veiculo.transmissao,
             "ar_condicionado": veiculo.ar_condicionado,
             "direcao_assistida": veiculo.direcao_assistida,
-            "imagem_url": veiculo.imagem_url, 
-            "combustivel": (
-                emissao.combustivel.tipo
-                if emissao and emissao.combustivel
-                else consumo.combustivel.tipo
-                if consumo and consumo.combustivel
-                else None
-            ),
+            "imagem_url": veiculo.imagem_url,
 
-            # Dados de emissão (se houver)
-            "emissao_nmhc": float(emissao.nmhc) if emissao and emissao.nmhc else None,
-            "emissao_co": float(emissao.co) if emissao and emissao.co else None,
-            "emissao_nox": float(emissao.nox) if emissao and emissao.nox else None,
-            "emissao_co2": float(emissao.co2) if emissao and emissao.co2 else None,
+            "emissao_nmhc": float(emissao.nmhc) if emissao else None,
+            "emissao_co": float(emissao.co) if emissao else None,
+            "emissao_nox": float(emissao.nox) if emissao else None,
+            "emissao_co2": float(emissao.co2) if emissao else None,
 
-            # Dados de consumo (se houver)
-            "rendimento_cidade": float(consumo.rendimento_cidade) if consumo and consumo.rendimento_cidade else None,
-            "rendimento_estrada": float(consumo.rendimento_estrada) if consumo and consumo.rendimento_estrada else None,
-            "consumo_energetico": float(consumo.consumo_energetico) if consumo and consumo.consumo_energetico else None,
+            "rendimento_cidade": float(consumo.rendimento_cidade) if consumo else None,
+            "rendimento_estrada": float(consumo.rendimento_estrada) if consumo else None,
+            "consumo_energetico": float(consumo.consumo_energetico) if consumo else None,
+
+            # ✔ agora retornando os quartis do banco
+            "quartis": {
+                "nmhc": quartil.quartil_nmhc if quartil else None,
+                "co": quartil.quartil_co if quartil else None,
+                "nox": quartil.quartil_nox if quartil else None,
+                "co2": quartil.quartil_co2 if quartil else None,
+                "consumo_energetico": quartil.quartil_consumo_energetico if quartil else None,
+                "score": quartil.quartil_score if quartil else None,
+            }
         })
 
     return resultado
+
+
+
     
 @app.get("/comparar-carros")
 def comparar_carros(id1: int, id2: int, db: Session = Depends(get_db)):

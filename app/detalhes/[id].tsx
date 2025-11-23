@@ -22,23 +22,69 @@ const Card = ({ titulo, children }: { titulo: string; children: React.ReactNode 
 );
 
 // --- Componente de Linha com Seta Interno ---
-const LinhaComSeta = ({ rotulo, valor, unidade, direcao }: { rotulo: string; valor: any; unidade: string; direcao: 'up' | 'down' }) => {
+const LinhaComSeta = ({ rotulo, valor, unidade, direcao }: { rotulo: string; valor: any; unidade: string; direcao?: 'up' | 'down' }) => {
   const isUp = direcao === 'up';
-  // Se for pra cima (melhor), verde. Se for pra baixo (pior), vermelho.
-  // Para poluentes, a lógica é invertida (menor é melhor).
-  const corSeta = isUp ? '#4CAF50' : '#F44336';
-  const iconeSeta = isUp ? 'arrow-up-circle' : 'arrow-down-circle';
 
   return (
     <View style={estilos.linhaDetalhe}>
       <Text style={estilos.rotulo}>{rotulo}</Text>
       <View style={estilos.valorContainer}>
-        <Ionicons name={iconeSeta} size={20} color={corSeta} style={{ marginRight: 8 }} />
-        <Text style={estilos.valor}>{valor ?? 'N/A'} {unidade}</Text>
+        {direcao && (
+          <Ionicons
+            name={isUp ? "arrow-up-circle" : "arrow-down-circle"}
+            size={20}
+            color={isUp ? "#4CAF50" : "#F44336"}
+            style={{ marginRight: 8 }}
+          />
+        )}
+        <Text style={estilos.valor}>
+          {valor ?? 'N/A'} {unidade}
+        </Text>
       </View>
     </View>
   );
 };
+
+const direcaoPorQuartil = (valorQuartil: any) => {
+  if (!valorQuartil) return 'down';
+
+  const texto = String(valorQuartil).toLowerCase();
+
+  // Se vier "Intervalo X"
+  if (texto.includes("intervalo")) {
+    const numero = parseInt(texto.replace(/\D/g, ''));
+    return numero <= 2 ? 'up' : 'down';
+  }
+
+  // Caso venha apenas o número
+  const numero = parseInt(texto.replace(/\D/g, ''));
+  if (!isNaN(numero)) return numero <= 2 ? 'up' : 'down';
+
+  return 'down';
+};
+
+const corPorQuartilScore = (valor: any) => {
+  if (!valor) return "#F44336";
+
+  const texto = String(valor).toLowerCase();
+
+  if (texto.includes("intervalo")) {
+    const numero = parseInt(texto.replace(/\D/g, ''));
+    if (numero === 1) return "#4CAF50"; // top verde
+    if (numero === 2) return "#8BC34A"; // variação verde
+    if (numero === 3) return "#FFC107"; // amarelo
+    return "#F44336"; // ruim
+  }
+
+  // Caso venha letra A B C D
+  const nota = texto.toUpperCase();
+  if (nota === "A") return "#4CAF50";
+  if (nota === "B" || nota === "C") return "#FFC107";
+  return "#F44336";
+};
+
+
+
 
 
 const DetalhesCarro = () => {
@@ -69,6 +115,8 @@ const DetalhesCarro = () => {
             console.warn('Falha ao parsear carro dos params:', e);
           }
         }
+        
+
 
         if (id) {
           const resp = await fetch(`${API_BASE_URL}/carros/${id}`);
@@ -84,6 +132,8 @@ const DetalhesCarro = () => {
       } finally {
         setCarregando(false);
       }
+
+
     };
     init();
   }, [id, carroParam]);
@@ -96,20 +146,28 @@ const DetalhesCarro = () => {
     let finalUrl = 'https://cdn-icons-png.flaticon.com/512/744/744465.png';
     if (!isInvalida(urlBanco)) finalUrl = urlBanco!;
     else if (!isInvalida(urlPlanilha)) finalUrl = urlPlanilha!;
-    
+
     return finalUrl.startsWith('http') ? finalUrl : `${API_BASE_URL}${finalUrl.startsWith('/') ? '' : '/'}${finalUrl}`;
   };
 
+
+  const traduzirArCondicionado = (valor: any) => {
+    if (valor === 1 || valor === "1" || valor === "S" || valor === true) return "Sim";
+    if (valor === 0 || valor === "0" || valor === "N" || valor === false) return "Não";
+    return "N/A";
+  };
+
+
   const campos = {
-   ano: carro?.ano ?? 'N/A',
+    ano: carro?.ano ?? 'N/A',
     categoria: carro?.categoria ?? 'N/A',
     marca: carro?.marca ?? 'N/A',
     modelo: carro?.modelo ?? 'N/A',
     versao: carro?.versao ?? 'N/A',
     motor: carro?.motor ?? 'N/A',
     transmissao: carro?.['transmissão'] ?? carro?.transmissao ?? 'N/A',
-    direcaoAssistida: carro?.['direçao assistida'] ?? carro?.direcao_assistida ?? carro?.direcaoAssistida ??'N/A',
-    arCondicionado: carro?.['ar-condicionado'] ?? carro?.ar_condicionado ?? 'N/A',
+    direcaoAssistida: carro?.['direçao assistida'] ?? carro?.direcao_assistida ?? carro?.direcaoAssistida ?? 'N/A',
+    arCondicionado: traduzirArCondicionado(carro?.['ar-condicionado'] ?? carro?.ar_condicionado),
     combustivel: carro?.combustivel ?? carro?.combustível ?? 'N/A',
     nmhc: carro?.['emissao_nmhc'] ?? carro?.['emissão de nmhc (g/km)'] ?? 'N/A',
     co: carro?.['emissao_co'] ?? carro?.['emissão de co (g/km)'] ?? 'N/A',
@@ -121,7 +179,17 @@ const DetalhesCarro = () => {
     rendGasEstrada: carro?.['rendimento_estrada'] ?? carro?.['rendimento da gasolina ou diesel estrada (km/l)'] ?? 'N/A',
     consumoEnergetico: carro?.['consumo_energetico'] ?? carro?.['consumo energético (mj/km)'] ?? 'N/A',
     score: carro?.score_sustentabilidade ?? 9.5, // Valor de exemplo
+     quartil_nmhc: carro?.quartis?.nmhc ?? carro?.['quartil do nmhc'] ?? 'N/A',
+    quartil_co: carro?.quartis?.co ?? carro?.['quartil do co'] ?? 'N/A',
+    quartil_nox: carro?.quartis?.nox ?? carro?.['quartil do nox'] ?? 'N/A',
+    quartil_co2: carro?.quartis?.co2 ?? carro?.['quartil do co2'] ?? 'N/A',
+    quartil_consumoEnergetico: carro?.quartis?.consumo_energetico ?? carro?.['quartil do consumo energético'] ?? 'N/A',
+    quartil_score: carro?.quartis?.score ?? carro?.['quartil do score'] ?? 'N/A',
+
+
   };
+
+
 
   const traduzirDirecao = (valor: string) => {
     switch (valor?.toUpperCase()) {
@@ -170,7 +238,7 @@ const DetalhesCarro = () => {
   };
 
   return (
-    <View style={{flex: 1}}>
+    <View style={{ flex: 1 }}>
 
       <ScrollView style={estilos.container}>
         <View style={estilos.imagemContainer}>
@@ -188,9 +256,12 @@ const DetalhesCarro = () => {
             <Text style={estilos.subtituloCarro}>{campos.categoria} - {campos.ano}</Text>
           </View>
           <View style={estilos.scoreContainer}>
-            <Ionicons name="cloud-outline" size={40} color={getScoreColor()} />
-            <Text style={[estilos.scoreTexto, { color: getScoreColor() }]}>{campos.score?.toFixed(1)}</Text>
+            <Ionicons name="cloud-outline" size={40} color={corPorQuartilScore(campos.quartil_score)} />
+            <Text style={[estilos.scoreTexto, { color: corPorQuartilScore(campos.quartil_score) }]}>
+              {campos.quartil_score ?? 'N/A'}
+            </Text>
             <Text style={estilos.scoreLabel}>Score</Text>
+
           </View>
         </View>
 
@@ -205,21 +276,51 @@ const DetalhesCarro = () => {
 
         {/* --- Caixa 2: Poluentes --- */}
         <Card titulo="Emissões de Poluentes">
-          <LinhaComSeta rotulo="NMHC" valor={campos.nmhc} unidade="g/km" direcao="down" />
-          <LinhaComSeta rotulo="CO" valor={campos.co} unidade="g/km" direcao="down" />
-          <LinhaComSeta rotulo="NOx" valor={campos.nox} unidade="g/km" direcao="down" />
-          <LinhaComSeta rotulo="CO₂" valor={campos.co2} unidade="g/km" direcao="down" />
+
+          <LinhaComSeta
+            rotulo="NMHC"
+            valor={campos.nmhc}
+            unidade="g/km"
+            direcao={direcaoPorQuartil(campos.quartil_nmhc)}
+          />
+
+          <LinhaComSeta
+            rotulo="CO"
+            valor={campos.co}
+            unidade="g/km"
+            direcao={direcaoPorQuartil(campos.quartil_co)}
+          />
+
+          <LinhaComSeta
+            rotulo="NOx"
+            valor={campos.nox}
+            unidade="g/km"
+            direcao={direcaoPorQuartil(campos.quartil_nox)}
+          />
+
+          <LinhaComSeta
+            rotulo="CO₂"
+            valor={campos.co2}
+            unidade="g/km"
+            direcao={direcaoPorQuartil(campos.quartil_co2)}
+          />
         </Card>
+
 
         {/* --- Caixa 3: Rendimento --- */}
         <Card titulo="Rendimento e Consumo">
-          <LinhaComSeta rotulo="Etanol (Cidade)" valor={campos.rendEtanolCidade} unidade="km/l" direcao="up" />
-          <LinhaComSeta rotulo="Etanol (Estrada)" valor={campos.rendEtanolEstrada} unidade="km/l" direcao="up" />
-          <LinhaComSeta rotulo="Gasolina (Cidade)" valor={campos.rendGasCidade} unidade="km/l" direcao="up" />
-          <LinhaComSeta rotulo="Gasolina (Estrada)" valor={campos.rendGasEstrada} unidade="km/l" direcao="up" />
-          <LinhaComSeta rotulo="Consumo Energético" valor={campos.consumoEnergetico} unidade="MJ/km" direcao="down" />
+          <LinhaComSeta rotulo="Etanol (Cidade)" valor={campos.rendEtanolCidade} unidade="km/l" />
+          <LinhaComSeta rotulo="Etanol (Estrada)" valor={campos.rendEtanolEstrada} unidade="km/l" />
+          <LinhaComSeta rotulo="Gasolina (Cidade)" valor={campos.rendGasCidade} unidade="km/l" />
+          <LinhaComSeta rotulo="Gasolina (Estrada)" valor={campos.rendGasEstrada} unidade="km/l" />
+          <LinhaComSeta
+            rotulo="Consumo Energético"
+            valor={campos.consumoEnergetico}
+            unidade="MJ/km"
+            direcao={direcaoPorQuartil(campos.quartil_consumoEnergetico)}
+          />
         </Card>
-        
+
         <View style={{ height: 32 }} />
       </ScrollView>
     </View>
