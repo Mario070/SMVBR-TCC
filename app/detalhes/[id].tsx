@@ -189,7 +189,7 @@ const DetalhesCarro = () => {
 
   };
 
-
+  
 
   const traduzirDirecao = (valor: string) => {
     switch (valor?.toUpperCase()) {

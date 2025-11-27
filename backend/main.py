@@ -771,7 +771,7 @@ def get_veiculos_favoritos(usuario_id: int, db: Session = Depends(get_db)):
             "rendimento_estrada": float(consumo.rendimento_estrada) if consumo else None,
             "consumo_energetico": float(consumo.consumo_energetico) if consumo else None,
 
-            # ✔ agora retornando os quartis do banco
+            # pega do banco os quartis
             "quartis": {
                 "nmhc": quartil.quartil_nmhc if quartil else None,
                 "co": quartil.quartil_co if quartil else None,
